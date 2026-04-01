@@ -48,6 +48,7 @@ export class AppDb extends Dexie {
           name: 'Mi Primer Viaje',
           start_date: new Date().toISOString().split('T')[0] ?? '2026-01-01',
           end_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] ?? '2026-01-31',
+          is_national: false,
           countries_json: JSON.stringify([
             { code: 'COLOMBIA', acronym: 'CO', name: 'Colombia', flag: '🇨🇴', currency: 'COP' },
             { code: 'ESPANA', acronym: 'ES', name: 'España', flag: '🇪🇸', currency: 'EUR' },

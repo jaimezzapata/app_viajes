@@ -12,9 +12,11 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   const globalEndYmd = useTripStore((s) => s.tripEndYmd)
   const segments = useTripStore((s) => s.segments)
   const countries = useTripStore((s) => s.countries)
+  const isNational = useTripStore((s) => s.isNational)
   const setActiveTripId = useTripStore((s) => s.setActiveTripId)
 
   const [tripName, setTripName] = useState('Mi Viaje')
+  const [localIsNational, setLocalIsNational] = useState(isNational)
   const [localStartYmd, setLocalStartYmd] = useState(globalStartYmd)
   const [localEndYmd, setLocalEndYmd] = useState(globalEndYmd)
   const [localSegments, setLocalSegments] = useState<TripSegment[]>(segments)
@@ -38,21 +40,26 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       const today = new Date()
       setLocalStartYmd(toYmd(today))
       setLocalEndYmd(toYmd(addDays(today, 29)))
+      setLocalIsNational(false)
       setLocalSegments([])
       setLocalCountries([{ code: 'COLOMBIA', acronym: 'CO', name: 'Colombia', flag: '🇨🇴', currency: 'COP' }])
     } else {
       setLocalStartYmd(globalStartYmd)
       setLocalEndYmd(globalEndYmd)
+      setLocalIsNational(isNational)
       setLocalSegments(segments)
       setLocalCountries(countries)
       if (activeTripId) {
         db.viajes.get(activeTripId).then((t) => {
-          if (t && t.name) setTripName(t.name)
+          if (t) {
+            if (t.name) setTripName(t.name)
+            if (t.is_national != null) setLocalIsNational(t.is_national)
+          }
         })
       }
     }
     setDeleteWarningOpen(false)
-  }, [open, isNew, activeTripId, countries, segments, globalStartYmd, globalEndYmd])
+  }, [open, isNew, activeTripId, countries, segments, globalStartYmd, globalEndYmd, isNational])
 
   const stageOptions = useMemo(
     () => localCountries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
@@ -136,13 +143,13 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
         const data = (await resp.json()) as Array<{ cca2?: string; currencies?: Record<string, unknown> }>
         const first = data?.[0]
         const cca2 = String(first?.cca2 ?? '').toUpperCase()
-        const currency = first?.currencies ? Object.keys(first.currencies)[0] : ''
+        const currency = first?.currencies && !localIsNational ? Object.keys(first.currencies)[0] : 'COP'
         if (reqId !== reqIdRef.current) return
         if (newCountryName.trim() !== name) return
 
         if (cca2 && !touchedRef.current.acronym) setNewCountryAcronym(cca2)
         if (currency && !touchedRef.current.currency) setNewCountryCurrency(currency.toUpperCase())
-        if (cca2 && !touchedRef.current.flag) setNewCountryFlag(cca2ToFlag(cca2))
+        if (cca2 && !touchedRef.current.flag && !localIsNational) setNewCountryFlag(cca2ToFlag(cca2))
       } catch {
         return
       }
@@ -177,8 +184,8 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   function saveCountry() {
     const name = newCountryName.trim()
     const acronym = newCountryAcronym.trim().toUpperCase() || name.slice(0, 2).toUpperCase()
-    const currency = newCountryCurrency.trim().toUpperCase()
-    const flag = newCountryFlag.trim() || '🏳️'
+    const currency = localIsNational ? 'COP' : newCountryCurrency.trim().toUpperCase()
+    const flag = localIsNational ? '📍' : (newCountryFlag.trim() || '🏳️')
     if (!name) return
     if (!currency) return
 
@@ -257,6 +264,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
           name: tripName,
           start_date: localStartYmd,
           end_date: localEndYmd,
+          is_national: localIsNational,
           countries_json: JSON.stringify(localCountries),
           segments_json: JSON.stringify(normalized),
           created_at: ts,
@@ -268,6 +276,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       const nextTrip = {
         ...baseTrip,
         name: tripName,
+        is_national: localIsNational,
         start_date: localStartYmd,
         end_date: localEndYmd,
         countries_json: JSON.stringify(localCountries),
@@ -397,6 +406,32 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
               </Field>
             </div>
 
+            <div className="mb-4">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-xs font-medium text-zinc-300">Tipo de Viaje</div>
+              </div>
+              <div className="flex rounded-xl bg-zinc-900 overflow-hidden border border-zinc-800 p-1">
+                <button
+                  type="button"
+                  onClick={() => setLocalIsNational(false)}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                    !localIsNational ? 'bg-zinc-800 text-sky-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  🌍 Internacional
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocalIsNational(true)}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                    localIsNational ? 'bg-emerald-900/40 text-emerald-400 shadow-md border border-emerald-500/20' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  📍 Nacional (COP)
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Inicio">
                 <input
@@ -417,7 +452,9 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-300">Países del viaje</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-300">
+                {localIsNational ? 'Destinos (Ciudades)' : 'Países del viaje'}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {localCountries.map((c) => (
                   <div key={c.code} className={`flex items-center gap-2 rounded-2xl border px-3 py-2 transition-colors ${editingCountryCode === c.code ? 'border-sky-500/50 bg-sky-500/10' : 'border-zinc-900 bg-zinc-950/40'}`}>
@@ -450,44 +487,48 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
 
               <div className="mt-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
                 <div className="text-xs font-semibold text-zinc-300 transition-colors">
-                  {editingCountryCode ? 'Editando país' : 'Agregar país'}
+                  {editingCountryCode ? (localIsNational ? 'Editando destino' : 'Editando país') : (localIsNational ? 'Agregar ciudad/destino' : 'Agregar país')}
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className={`mt-2 grid ${localIsNational ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
                   <input
-                    className="col-span-2 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    className={`${localIsNational ? 'col-span-1' : 'col-span-2'} w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30`}
                     value={newCountryName}
                     onChange={(e) => setNewCountryName(e.target.value)}
-                    placeholder="Nombre (ej: Francia)"
+                    placeholder={localIsNational ? 'Nombre de ciudad (ej: Medellín)' : 'Nombre (ej: Francia)'}
                   />
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                    value={newCountryFlag}
-                    onChange={(e) => {
-                      touchedRef.current.flag = true
-                      setNewCountryFlag(e.target.value)
-                    }}
-                    placeholder="🇫🇷"
-                  />
+                  {!localIsNational && (
+                    <input
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                      value={newCountryFlag}
+                      onChange={(e) => {
+                        touchedRef.current.flag = true
+                        setNewCountryFlag(e.target.value)
+                      }}
+                      placeholder="🇫🇷"
+                    />
+                  )}
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <input
-                    className="w-24 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    className={`${localIsNational ? 'w-full' : 'w-24'} rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30`}
                     value={newCountryAcronym}
                     onChange={(e) => {
                       touchedRef.current.acronym = true
                       setNewCountryAcronym(e.target.value)
                     }}
-                    placeholder="FR"
+                    placeholder={localIsNational ? 'Sigla (Opcional, ej: MED)' : 'FR'}
                   />
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                    value={newCountryCurrency}
-                    onChange={(e) => {
-                      touchedRef.current.currency = true
-                      setNewCountryCurrency(e.target.value)
-                    }}
-                    placeholder="Moneda (ej: EUR)"
-                  />
+                  {!localIsNational && (
+                    <input
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                      value={newCountryCurrency}
+                      onChange={(e) => {
+                        touchedRef.current.currency = true
+                        setNewCountryCurrency(e.target.value)
+                      }}
+                      placeholder="Moneda (ej: EUR)"
+                    />
+                  )}
                 </div>
                 <div className="mt-3 flex items-center justify-end gap-2">
                   {editingCountryCode ? (
@@ -503,7 +544,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                     className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50 transition-all"
                     type="button"
                     onClick={saveCountry}
-                    disabled={!newCountryName.trim() || !newCountryCurrency.trim()}
+                    disabled={!newCountryName.trim() || (!localIsNational && !newCountryCurrency.trim())}
                   >
                     {editingCountryCode ? 'Guardar cambios' : 'Agregar'}
                   </button>
@@ -513,7 +554,9 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
 
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-300">Tramos (país por fechas)</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
+                  {localIsNational ? 'Tramos (Destino por fechas)' : 'Tramos (país por fechas)'}
+                </div>
                 <button
                   className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-100 hover:bg-zinc-800"
                   type="button"

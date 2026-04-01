@@ -29,6 +29,7 @@ export default function ActivityModal({
   const tripStartYmd = useTripStore((s) => s.tripStartYmd)
   const selectedYmd = useTripStore((s) => s.selectedYmd)
   const countries = useTripStore((s) => s.countries)
+  const isNational = useTripStore((s) => s.isNational)
 
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -43,6 +44,7 @@ export default function ActivityModal({
   // Dual-save / Mirror Expense
   const [createExpense, setCreateExpense] = useState(true)
   const [expenseAmountStr, setExpenseAmountStr] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -252,7 +254,9 @@ export default function ActivityModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          onClick={onClose}
+          onClick={() => {
+            if (!showDeleteConfirm) onClose()
+          }}
         >
           <motion.div
             className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl border border-zinc-900 bg-zinc-950 p-5 shadow-2xl sm:rounded-3xl custom-scrollbar"
@@ -268,7 +272,10 @@ export default function ActivityModal({
               </h2>
               <button
                 className="rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition-colors hover:bg-zinc-800"
-                onClick={onClose}
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  onClose()
+                }}
                 type="button"
               >
                 Cerrar
@@ -276,7 +283,34 @@ export default function ActivityModal({
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+                <div className="mb-2 text-[11px] font-medium tracking-wide text-zinc-400">
+                  {isNational ? 'Destino / Ciudad (*)' : 'País / Etapa (*)'}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {countries.map((c) => {
+                    const active = stage === c.code
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        className={
+                          'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
+                          (active
+                            ? 'border-sky-500 bg-sky-500/10 text-zinc-50'
+                            : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
+                        }
+                        onClick={() => setStage(c.code)}
+                      >
+                        <div className="text-base leading-none">{c.flag}</div>
+                        <div className="max-w-full truncate leading-none">{c.name}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
                 <Field label="Fecha (*)">
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 transition-colors focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
@@ -285,22 +319,6 @@ export default function ActivityModal({
                     onChange={(e) => setDate(e.target.value)}
                   />
                 </Field>
-                <Field label="País / Etapa (*)">
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 transition-colors focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
-                    value={stage}
-                    onChange={(e) => setStage(e.target.value)}
-                  >
-                    {countries.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <Field label="Hora Inicio">
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
@@ -389,7 +407,7 @@ export default function ActivityModal({
                 </div>
                 
                 <div className="mt-3">
-                  <Field label={`Valor en ${countries.find(c => c.code === stage)?.currency || '?'} (*)`}>
+                  <Field label={`Valor en ${isNational ? 'COP' : countries.find(c => c.code === stage)?.currency || '?'} (*)`}>
                     <input
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-medium text-emerald-400 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                       type="number"
@@ -403,34 +421,58 @@ export default function ActivityModal({
             </div>
 
             <div className="mt-6 flex items-center justify-between gap-3">
-              {existingItem ? (
-                <button
-                  className="rounded-xl px-4 py-3 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/10 active:scale-95"
-                  onClick={onDelete}
-                  type="button"
-                >
-                  Eliminar
-                </button>
+              {showDeleteConfirm ? (
+                <div className="flex w-full items-center justify-between rounded-2xl border border-rose-900/50 bg-rose-950/30 p-2 pl-4">
+                  <span className="text-sm font-semibold text-rose-400">¿Eliminar actividad?</span>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-900"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      type="button"
+                    >
+                      No
+                    </button>
+                    <button
+                      className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                      onClick={onDelete}
+                      type="button"
+                    >
+                      Sí, eliminar
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <div />
+                <>
+                  {existingItem ? (
+                    <button
+                      className="rounded-xl px-4 py-3 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/10 active:scale-95"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      type="button"
+                    >
+                      Eliminar
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-zinc-100 transition-colors hover:bg-zinc-800 active:scale-95"
+                      onClick={onClose}
+                      type="button"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      disabled={!title.trim() || !expenseAmountStr}
+                      className="rounded-xl bg-sky-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all hover:bg-sky-400 active:scale-95 disabled:opacity-50 disabled:shadow-none"
+                      onClick={onSave}
+                      type="button"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </>
               )}
-              <div className="flex gap-2">
-                <button
-                  className="rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-zinc-100 transition-colors hover:bg-zinc-800 active:scale-95"
-                  onClick={onClose}
-                  type="button"
-                >
-                  Cancelar
-                </button>
-                <button
-                  disabled={!title.trim() || !expenseAmountStr}
-                  className="rounded-xl bg-sky-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all hover:bg-sky-400 active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                  onClick={onSave}
-                  type="button"
-                >
-                  Guardar
-                </button>
-              </div>
             </div>
           </motion.div>
         </motion.div>

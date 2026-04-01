@@ -21,6 +21,7 @@ CREATE TABLE public.viajes (
   name text NOT NULL,
   start_date date NOT NULL,
   end_date date NOT NULL,
+  is_national boolean NOT NULL DEFAULT false,
   countries_json jsonb NOT NULL DEFAULT '[]'::jsonb,
   segments_json jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),

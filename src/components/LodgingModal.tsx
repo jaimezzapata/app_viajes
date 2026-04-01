@@ -1,8 +1,9 @@
 import type { AppLodging, AppExpense } from '@/../shared/types'
 import type { TripCountry } from '@/stores/tripStore'
+import { useTripStore } from '@/stores/tripStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatFxRate, getRateToCop } from '@/fx/fx'
 
 export type LodgingFormState = {
@@ -47,8 +48,10 @@ export default function LodgingModal({
   isEditing?: boolean
   onDelete?: () => void
 }) {
+  const isNational = useTripStore((s) => s.isNational)
   const fxTouchedRef = useRef(false)
   const currencyTouchedRef = useRef(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const stageOptions = useMemo(
     () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, currency: c.currency })),
@@ -122,7 +125,9 @@ export default function LodgingModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={() => {
+            if (!showDeleteConfirm) onClose()
+          }}
           role="dialog"
           aria-modal="true"
         >
@@ -136,13 +141,20 @@ export default function LodgingModal({
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold">{isEditing ? 'Editar hospedaje' : 'Nuevo hospedaje'}</div>
-              <button className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" onClick={onClose} type="button">
+              <button 
+                className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  onClose()
+                }} 
+                type="button"
+              >
                 Cerrar
               </button>
             </div>
 
             <div className="mb-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
-              <div className="text-xs font-semibold text-zinc-100 mb-2">País</div>
+              <div className="text-xs font-semibold text-zinc-100 mb-2">{isNational ? 'Destino/Ciudad' : 'País'}</div>
               <div className="grid grid-cols-3 gap-2">
                 {stageOptions.map((o) => {
                   const active = form.stage === o.stage
@@ -231,35 +243,39 @@ export default function LodgingModal({
 
             <div className="mt-4 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
               <div className="text-xs font-semibold text-zinc-100 mb-2">Costo del hospedaje (Opcional)</div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Moneda">
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                    value={form.currency}
-                    onChange={(e) => {
-                      setCurrency(e.target.value)
-                      void prefillFxRate(e.target.value, form.check_in)
-                    }}
-                  >
-                    {currencyOptions.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Tasa a COP">
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                    inputMode="decimal"
-                    value={form.fxRate}
-                    onChange={(e) => {
-                      fxTouchedRef.current = true
-                      setForm((f) => ({ ...f, fxRate: e.target.value }))
-                    }}
-                    placeholder="1"
-                  />
-                </Field>
-                <div className="col-span-2">
-                  <Field label="Monto total">
+              <div className={`grid ${isNational ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                {!isNational && (
+                  <>
+                    <Field label="Moneda">
+                      <select
+                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                        value={form.currency}
+                        onChange={(e) => {
+                          setCurrency(e.target.value)
+                          void prefillFxRate(e.target.value, form.check_in)
+                        }}
+                      >
+                        {currencyOptions.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Tasa a COP">
+                      <input
+                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                        inputMode="decimal"
+                        value={form.fxRate}
+                        onChange={(e) => {
+                          fxTouchedRef.current = true
+                          setForm((f) => ({ ...f, fxRate: e.target.value }))
+                        }}
+                        placeholder="1"
+                      />
+                    </Field>
+                  </>
+                )}
+                <div className={isNational ? 'col-span-1' : 'col-span-2'}>
+                  <Field label={isNational ? 'Monto total (COP)' : 'Monto total'}>
                     <input
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                       inputMode="decimal"
@@ -270,7 +286,7 @@ export default function LodgingModal({
                   </Field>
                 </div>
               </div>
-              {form.amountOriginal.trim() !== '' && amountCop > 0 ? (
+              {form.amountOriginal.trim() !== '' && amountCop > 0 && !isNational ? (
                 <div className="mt-2 text-[11px] text-zinc-400">
                   Total en base: {formatCop(amountCop)}
                 </div>
@@ -278,34 +294,54 @@ export default function LodgingModal({
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="text-[11px] text-zinc-400 leading-tight max-w-[150px]">
-                {!canSave && disabledReason ? disabledReason : (
-                  form.amountOriginal ? 'Se guardará también como gasto.' : 'Solo se guardará la reserva.'
-                )}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                {isEditing && onDelete ? (
-                  <button
-                    className="rounded-2xl border border-rose-900 bg-rose-950/30 px-3 py-2 text-sm font-semibold text-rose-400 transition-all hover:bg-rose-900/50 active:scale-95"
-                    onClick={() => {
-                      if (window.confirm('¿Seguro que deseas eliminar este hospedaje? También eliminará su gasto asociado si lo hay.')) {
-                        onDelete()
-                      }
-                    }}
-                    type="button"
-                  >
-                    Eliminar
-                  </button>
-                ) : null}
-                <button
-                  className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:bg-sky-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => void onSave()}
-                  disabled={!canSave}
-                  type="button"
-                >
-                  {isEditing ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
+              {showDeleteConfirm ? (
+                <div className="flex w-full items-center justify-between rounded-2xl border border-rose-900/50 bg-rose-950/30 p-2 pl-4">
+                  <span className="text-sm font-semibold text-rose-400">¿Eliminar hospedaje?</span>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-900"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      type="button"
+                    >
+                      No
+                    </button>
+                    <button
+                      className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                      onClick={onDelete}
+                      type="button"
+                    >
+                      Sí, eliminar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-[11px] text-zinc-400 leading-tight max-w-[150px]">
+                    {!canSave && disabledReason ? disabledReason : (
+                      form.amountOriginal ? 'Se guardará también como gasto.' : 'Solo se guardará la reserva.'
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {isEditing && onDelete ? (
+                      <button
+                        className="rounded-2xl border border-rose-900 bg-rose-950/30 px-3 py-2 text-sm font-semibold text-rose-400 transition-all hover:bg-rose-900/50 active:scale-95"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        type="button"
+                      >
+                        Eliminar
+                      </button>
+                    ) : null}
+                    <button
+                      className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:bg-sky-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void onSave()}
+                      disabled={!canSave}
+                      type="button"
+                    >
+                      {isEditing ? 'Actualizar' : 'Guardar'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {errorMessage ? <div className="mt-3 rounded-2xl border border-rose-900 bg-rose-950/30 p-3 text-xs text-rose-200">{errorMessage}</div> : null}

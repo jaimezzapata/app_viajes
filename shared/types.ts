@@ -134,6 +134,7 @@ export type AppTrip = {
   end_date: string
   countries_json: string 
   segments_json: string
+  is_national: boolean
   created_at: string
   updated_at: string
   deleted_at: string | null

@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import { useOnline } from '@/hooks/useOnline'
 import { syncNow } from '@/sync/sync'
+import { supabase } from '@/supabase/client'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
+import { LogOut } from 'lucide-react'
 import { useTripStore } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { addDays, toYmd } from '@/utils/date'
@@ -48,6 +50,10 @@ export default function AppShell({ children }: PropsWithChildren) {
     } finally {
       window.location.reload()
     }
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
   }
 
   return (
@@ -97,6 +103,15 @@ export default function AppShell({ children }: PropsWithChildren) {
                 disabled={!online || syncing}
               >
                 {syncing ? 'Syncing...' : 'Sincronizar'}
+              </button>
+              <button
+                className="flex items-center justify-center rounded-xl bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-400 transition-colors hover:bg-rose-500/20"
+                type="button"
+                onClick={handleSignOut}
+                title="Cerrar sesión"
+              >
+                <LogOut className="h-3 w-3 mr-1" />
+                Salir
               </button>
             </div>
           </div>

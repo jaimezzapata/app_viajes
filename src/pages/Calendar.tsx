@@ -45,13 +45,14 @@ export default function Calendar() {
       const categories = await db.categorias.toArray()
       const byId = new Map(categories.map((c) => [c.id, c]))
 
+      const allExpenses = await db.gastos.where('trip_id').equals(activeTripId).filter(e => !e.deleted_at).toArray()
+      const allItineraries = await db.itinerarios.where('trip_id').equals(activeTripId).filter(i => !i.deleted_at).toArray()
+      const allLodgings = await db.hospedajes.where('trip_id').equals(activeTripId).filter(l => !l.deleted_at).toArray()
+      const allActivities = await db.actividades.where('trip_id').equals(activeTripId).filter(a => !a.deleted_at).toArray()
+
       const result: DaySummary[] = []
       for (const ymd of days) {
-        const expenses = await db.gastos
-          .where('trip_id')
-          .equals(activeTripId)
-          .filter((e) => e.date === ymd && !e.deleted_at)
-          .toArray()
+        const expenses = allExpenses.filter(e => e.date === ymd)
 
         const items = expenses
           .slice(0, 6)
@@ -66,15 +67,8 @@ export default function Calendar() {
           })
         const totalCop = expenses.reduce((acc, e) => acc + e.amount_cop, 0)
         
-        const itineraries = await db.itinerarios
-          .where('trip_id')
-          .equals(activeTripId)
-          .filter((i) => i.date === ymd && !i.deleted_at)
-          .toArray()
-        
-        itineraries.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
-
-        const routes = itineraries.map((i) => ({
+        const dayItis = allItineraries.filter(i => i.date === ymd).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+        const routes = dayItis.map((i) => ({
           id: i.id,
           type: i.type,
           title: i.title,
@@ -83,22 +77,11 @@ export default function Calendar() {
           time: i.start_time,
         }))
 
-        const allLodgings = await db.hospedajes
-          .where('trip_id')
-          .equals(activeTripId)
-          .filter((l) => !l.deleted_at)
-          .toArray()
         const activeLodgings = allLodgings.filter((l) => ymd >= l.check_in && ymd < l.check_out)
         const lodgings = activeLodgings.map((l) => ({ id: l.id, name: l.name, city: l.city }))
 
-        const allActivities = await db.actividades
-          .where('trip_id')
-          .equals(activeTripId)
-          .filter((a) => !a.deleted_at && a.date === ymd)
-          .toArray()
-        allActivities.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
-        
-        const activities = allActivities.map((a) => ({ id: a.id, type: a.type, title: a.title, time: a.start_time }))
+        const dayActs = allActivities.filter(a => a.date === ymd).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+        const activities = dayActs.map((a) => ({ id: a.id, type: a.type, title: a.title, time: a.start_time }))
 
         result.push({ ymd, totalCop, items, routes, lodgings, activities })
       }

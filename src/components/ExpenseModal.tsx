@@ -1,7 +1,7 @@
 import type { AppCategory } from '@/../shared/types'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ExpenseFormState } from '@/types/expenses'
 import { CATEGORY_KIND_LABEL } from '@/utils/categoryPalette'
 import { stageForYmd, useTripStore } from '@/stores/tripStore'
@@ -34,10 +34,12 @@ export default function ExpenseModal({
   isEditing?: boolean
   onDelete?: () => void
 }) {
-  const segments = useTripStore((s) => s.segments)
   const countries = useTripStore((s) => s.countries)
+  const segments = useTripStore((s) => s.segments)
+  const isNational = useTripStore((s) => s.isNational)
   const fxTouchedRef = useRef(false)
   const currencyTouchedRef = useRef(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const stageOptions = useMemo(
     () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, currency: c.currency })),
@@ -159,7 +161,9 @@ export default function ExpenseModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={() => {
+            if (!showDeleteConfirm) onClose()
+          }}
           role="dialog"
           aria-modal="true"
         >
@@ -173,7 +177,14 @@ export default function ExpenseModal({
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold">{isEditing ? 'Editar gasto' : 'Nuevo gasto'}</div>
-              <button className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" onClick={onClose} type="button">
+              <button 
+                className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" 
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  onClose()
+                }} 
+                type="button"
+              >
                 Cerrar
               </button>
             </div>
@@ -252,7 +263,7 @@ export default function ExpenseModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${isNational ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
               <Field label="Fecha">
                 <input
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
@@ -262,22 +273,27 @@ export default function ExpenseModal({
                 />
               </Field>
 
-              <Field label="Moneda">
-                <select
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                  value={form.currency}
-                  onChange={(e) => {
-                    setCurrency(e.target.value as ExpenseFormState['currency'])
-                    void prefillFxRate(e.target.value as ExpenseFormState['currency'], form.date)
-                  }}
-                >
-                  {currencyOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {!isNational && (
+                <Field label="Moneda">
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    value={form.currency}
+                    onChange={(e) => {
+                      setCurrency(e.target.value as ExpenseFormState['currency'])
+                      void prefillFxRate(e.target.value as ExpenseFormState['currency'], form.date)
+                    }}
+                  >
+                    {currencyOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </div>
+            
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <Field label="Categoría">
                 <select
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
@@ -315,27 +331,31 @@ export default function ExpenseModal({
                 </select>
               </Field>
 
-              <Field label="Monto">
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                  inputMode="decimal"
-                  value={form.amountOriginal}
-                  onChange={(e) => setForm((f) => ({ ...f, amountOriginal: e.target.value }))}
-                  placeholder="0"
-                />
-              </Field>
-              <Field label="Tasa a COP">
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                  inputMode="decimal"
-                  value={form.fxRate}
-                  onChange={(e) => {
-                    fxTouchedRef.current = true
-                    setForm((f) => ({ ...f, fxRate: e.target.value }))
-                  }}
-                  placeholder="1"
-                />
-              </Field>
+              <div className={isNational ? 'col-span-2' : ''}>
+                <Field label={isNational ? 'Monto (COP)' : 'Monto'}>
+                  <input
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    inputMode="decimal"
+                    value={form.amountOriginal}
+                    onChange={(e) => setForm((f) => ({ ...f, amountOriginal: e.target.value }))}
+                    placeholder="0"
+                  />
+                </Field>
+              </div>
+              {!isNational && (
+                <Field label="Tasa a COP">
+                  <input
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    inputMode="decimal"
+                    value={form.fxRate}
+                    onChange={(e) => {
+                      fxTouchedRef.current = true
+                      setForm((f) => ({ ...f, fxRate: e.target.value }))
+                    }}
+                    placeholder="1"
+                  />
+                </Field>
+              )}
             </div>
 
             <div className="mt-3">
@@ -349,31 +369,49 @@ export default function ExpenseModal({
               </Field>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="text-xs text-zinc-400">Equivalente aprox: {formatCop(amountCop)}</div>
-              <div className="flex gap-2">
-                {isEditing && onDelete ? (
+            <div className={`mt-4 flex items-center ${isNational ? 'justify-end' : 'justify-between'} gap-3`}>
+              {!isNational && !showDeleteConfirm && <div className="text-xs text-zinc-400">Equivalente aprox: {formatCop(amountCop)}</div>}
+              {showDeleteConfirm ? (
+                <div className="flex w-full items-center justify-between rounded-2xl border border-rose-900/50 bg-rose-950/30 p-2 pl-4">
+                  <span className="text-sm font-semibold text-rose-400">¿Eliminar gasto?</span>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-900"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      type="button"
+                    >
+                      No
+                    </button>
+                    <button
+                      className="rounded-xl bg-rose-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+                      onClick={onDelete}
+                      type="button"
+                    >
+                      Sí, eliminar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  {isEditing && onDelete ? (
+                    <button
+                      className="rounded-2xl border border-rose-900 bg-rose-950/30 px-3 py-2 text-sm font-semibold text-rose-400 transition-all hover:bg-rose-900/50 active:scale-95"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      type="button"
+                    >
+                      Eliminar
+                    </button>
+                  ) : null}
                   <button
-                    className="rounded-2xl border border-rose-900 bg-rose-950/30 px-3 py-2 text-sm font-semibold text-rose-400 transition-all hover:bg-rose-900/50 active:scale-95"
-                    onClick={() => {
-                      if (window.confirm('¿Seguro que deseas eliminar este gasto?')) {
-                        onDelete()
-                      }
-                    }}
+                    className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:bg-sky-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void onSave()}
+                    disabled={!canSave}
                     type="button"
                   >
-                    Eliminar
+                    {isEditing ? 'Actualizar' : 'Guardar'}
                   </button>
-                ) : null}
-                <button
-                  className="rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:bg-sky-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => void onSave()}
-                  disabled={!canSave}
-                  type="button"
-                >
-                  {isEditing ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
+                </div>
+              )}
             </div>
 
             {!canSave && disabledReason ? <div className="mt-2 text-xs text-zinc-400">{disabledReason}</div> : null}

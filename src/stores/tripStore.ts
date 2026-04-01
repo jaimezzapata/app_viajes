@@ -30,6 +30,7 @@ import type { AppTrip } from '@/../shared/types'
 
 type TripState = {
   activeTripId: string | null
+  isNational: boolean
   tripStartYmd: string
   tripEndYmd: string
   segments: TripSegment[]
@@ -50,6 +51,7 @@ export const useTripStore = create<TripState>()(
   persist(
     (set) => ({
       activeTripId: null,
+      isNational: false,
       tripStartYmd: toYmd(new Date()),
       tripEndYmd: toYmd(addDays(new Date(), 29)),
       segments: [],
@@ -71,6 +73,7 @@ export const useTripStore = create<TripState>()(
           const stage = stageForYmd(s.selectedYmd, parsedSegments, parsedCountries[0]?.code ?? s.stage)
           return {
             activeTripId: trip.id,
+            isNational: trip.is_national ?? false,
             tripStartYmd: trip.start_date,
             tripEndYmd: trip.end_date,
             countries: parsedCountries,
