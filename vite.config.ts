@@ -8,6 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   build: {
     sourcemap: 'hidden',
+    chunkSizeWarningLimit: 4000,
   },
   plugins: [
     react({
@@ -60,6 +61,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5000000,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
         runtimeCaching: [
