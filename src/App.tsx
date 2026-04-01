@@ -1,0 +1,64 @@
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
+import { useEffect } from 'react'
+import { useLiveQuery } from '@/hooks/useLiveQuery'
+import { db } from '@/db/appDb'
+import { useTripStore } from '@/stores/tripStore'
+import AppShell from '@/components/AppShell'
+import Calendar from '@/pages/Calendar'
+import Expenses from '@/pages/Expenses'
+import Itinerary from '@/pages/Itinerary'
+import Lodging from '@/pages/Lodging'
+import Activities from '@/pages/Activities'
+import Reports from '@/pages/Reports'
+
+function TripSyncer() {
+  const activeTripId = useTripStore((s) => s.activeTripId)
+  const loadTrip = useTripStore((s) => s.loadTrip)
+
+  const { value: trip } = useLiveQuery(
+    async () => (activeTripId ? await db.viajes.get(activeTripId) : undefined),
+    [activeTripId],
+    undefined
+  )
+
+  useEffect(() => {
+    if (!activeTripId) {
+      useTripStore.getState().setActiveTripId('00000000-0000-0000-0000-000000000001')
+    } else if (trip && trip.id === activeTripId) {
+      loadTrip(trip)
+    }
+  }, [activeTripId, trip, loadTrip])
+
+  return null
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <TripSyncer />
+      <AppShell>
+        <AnimatedRoutes />
+      </AppShell>
+    </BrowserRouter>
+  )
+}
+
+function AnimatedRoutes() {
+  const location = useLocation()
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<Navigate to="/calendario" replace />} />
+        <Route path="/calendario" element={<Calendar />} />
+        <Route path="/gastos" element={<Expenses />} />
+        <Route path="/itinerario" element={<Itinerary />} />
+        <Route path="/actividades" element={<Activities />} />
+        <Route path="/hospedaje" element={<Lodging />} />
+        <Route path="/reportes" element={<Reports />} />
+        <Route path="*" element={<Navigate to="/calendario" replace />} />
+      </Routes>
+    </AnimatePresence>
+  )
+}
