@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTripStore, type TripCountry, type TripSegment, type TripStage, clampYmd, normalizeSegment } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { toYmd, addDays } from '@/utils/date'
 import { db } from '@/db/appDb'
+import type { AppBudget } from '@/../shared/types'
 
 export default function TripConfigModal({ open, onClose, isNew }: { open: boolean; onClose: () => void; isNew?: boolean }) {
   const activeTripId = useTripStore((s) => s.activeTripId)
@@ -14,6 +16,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   const countries = useTripStore((s) => s.countries)
   const isNational = useTripStore((s) => s.isNational)
   const setActiveTripId = useTripStore((s) => s.setActiveTripId)
+  const navigate = useNavigate()
 
   const [tripName, setTripName] = useState('Mi Viaje')
   const [localIsNational, setLocalIsNational] = useState(isNational)
@@ -28,6 +31,11 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   const [editingCountryCode, setEditingCountryCode] = useState<string | null>(null)
   const [renamedCodes, setRenamedCodes] = useState<Record<string, string>>({})
   const [deleteWarningOpen, setDeleteWarningOpen] = useState(false)
+  
+  const [step, setStep] = useState<'config' | 'budget'>('config')
+  const [initialBudget, setInitialBudget] = useState('')
+
+  const segmentsEndRef = useRef<HTMLDivElement>(null)
 
   const touchedRef = useRef({ acronym: false, currency: false, flag: false })
   const lastNameRef = useRef('')
@@ -35,6 +43,8 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
 
   useEffect(() => {
     if (!open) return
+    setStep('config')
+    setInitialBudget('')
     if (isNew) {
       setTripName('Nuevo Viaje')
       const today = new Date()
@@ -83,7 +93,11 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       startYmd: baseStart,
       endYmd: baseStart,
     }
-    setLocalSegments((prev) => [...prev, seg])
+    setLocalSegments((prev) => {
+      const next = [...prev, seg]
+      setTimeout(() => segmentsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
+      return next
+    })
   }
 
   function removeSeg(id: string) {
@@ -330,6 +344,47 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       }
     }
 
+    if (isNew) {
+      setStep('budget')
+    } else {
+      onClose()
+    }
+  }
+
+  async function onSaveBudget() {
+    const raw = initialBudget.replace(/\./g, '').replace(',', '.')
+    const parsed = Number(raw)
+    const amount = Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0
+    
+    if (amount > 0 && activeTripId) {
+      const ts = nowIso()
+      const item: AppBudget = {
+        id: newId(),
+        user_id: null,
+        trip_id: activeTripId,
+        stage: 'GLOBAL',
+        category_id: null,
+        amount_cop: amount,
+        created_at: ts,
+        updated_at: ts,
+        deleted_at: null,
+      }
+      await db.transaction('rw', db.presupuestos, db.outbox, async () => {
+        await db.presupuestos.put(item)
+        await db.outbox.add({
+          id: newId(),
+          table_name: 'presupuestos',
+          op: 'UPSERT',
+          entity_id: item.id,
+          payload: item,
+          created_at: ts,
+          try_count: 0,
+          last_error: null,
+        })
+      })
+    }
+
+    navigate('/gastos')
     onClose()
   }
 
@@ -387,12 +442,14 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold">Configurar viaje</div>
-              <button className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" onClick={onClose} type="button">
-                Cerrar
-              </button>
-            </div>
+            {step === 'config' ? (
+              <>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold">Configurar viaje</div>
+                  <button className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" onClick={onClose} type="button">
+                    Cerrar
+                  </button>
+                </div>
 
             <div className="mb-4">
               <Field label="Nombre del Viaje">
@@ -644,6 +701,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                     </div>
                   </div>
                 ))}
+                <div ref={segmentsEndRef} className="h-1" />
               </div>
             </div>
 
@@ -716,7 +774,45 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                 ) : null}
               </AnimatePresence>
             </div>
-
+            </>
+            ) : (
+              <div className="flex flex-col h-full justify-center text-center py-6">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 mb-4">
+                  <span className="text-3xl">🎉</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">¡Viaje creado con éxito!</h3>
+                <p className="text-sm text-zinc-400 mb-6 px-4">
+                  Antes de ir al calendario o registrar gastos, puedes definir un presupuesto global para tu viaje.
+                </p>
+                <div className="mb-8 px-4">
+                  <label className="block text-left text-xs font-semibold uppercase tracking-wide text-zinc-300 mb-2">Presupuesto Global (COP)</label>
+                  <input
+                    className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-lg font-bold text-sky-400 text-center focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    placeholder="Ej: 3.500.000"
+                    inputMode="numeric"
+                    value={initialBudget}
+                    onChange={(e) => setInitialBudget(e.target.value)}
+                  />
+                  <p className="text-xs text-zinc-500 mt-2 text-left">Puedes cambiarlo más tarde en la pestaña de Reportes.</p>
+                </div>
+                <div className="flex flex-col gap-2 px-4">
+                  <button
+                    className="w-full rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-sky-400 active:scale-[0.98] transition-transform"
+                    onClick={() => void onSaveBudget()}
+                    type="button"
+                  >
+                    Guardar presupuesto y continuar
+                  </button>
+                  <button
+                    className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-zinc-300 hover:bg-zinc-900 active:scale-[0.98] transition-transform"
+                    onClick={() => { navigate('/gastos'); onClose(); }}
+                    type="button"
+                  >
+                    Omitir por ahora
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       ) : null}

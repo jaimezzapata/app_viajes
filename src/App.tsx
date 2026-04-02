@@ -27,9 +27,7 @@ function TripSyncer() {
   )
 
   useEffect(() => {
-    if (!activeTripId) {
-      useTripStore.getState().setActiveTripId('00000000-0000-0000-0000-000000000001')
-    } else if (trip && trip.id === activeTripId) {
+    if (activeTripId && trip && trip.id === activeTripId) {
       loadTrip(trip)
     }
   }, [activeTripId, trip, loadTrip])
