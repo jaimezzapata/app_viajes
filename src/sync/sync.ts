@@ -84,19 +84,20 @@ export async function syncNow() {
   const pending = await db.outbox.orderBy('created_at').toArray()
 
   if (pending.length > 0) {
-    const entityToOutboxIds = new Map<string, string[]>()
-    const latestByEntity = new Map<string, OutboxItem>()
+    const entityKeyToOutboxIds = new Map<string, string[]>()
+    const latestByEntityKey = new Map<string, OutboxItem>()
 
     for (const item of pending) {
-      if (!entityToOutboxIds.has(item.entity_id)) {
-        entityToOutboxIds.set(item.entity_id, [])
+      const entityKey = `${item.table_name}:${item.entity_id}`
+      if (!entityKeyToOutboxIds.has(entityKey)) {
+        entityKeyToOutboxIds.set(entityKey, [])
       }
-      entityToOutboxIds.get(item.entity_id)!.push(item.id)
-      latestByEntity.set(item.entity_id, item)
+      entityKeyToOutboxIds.get(entityKey)!.push(item.id)
+      latestByEntityKey.set(entityKey, item)
     }
 
     const byTable = new Map<string, { upserts: OutboxItem[]; deletes: OutboxItem[] }>()
-    for (const item of latestByEntity.values()) {
+    for (const item of latestByEntityKey.values()) {
       if (!byTable.has(item.table_name)) {
         byTable.set(item.table_name, { upserts: [], deletes: [] })
       }
@@ -134,12 +135,14 @@ export async function syncNow() {
           const { error } = await supabase.from(table).upsert(payloads as never[])
           if (error) throw error
           for (const i of group.upserts) {
-            successOutboxIds.push(...(entityToOutboxIds.get(i.entity_id) ?? []))
+            const entityKey = `${i.table_name}:${i.entity_id}`
+            successOutboxIds.push(...(entityKeyToOutboxIds.get(entityKey) ?? []))
           }
         } catch (e) {
           const message = e instanceof Error ? e.message : 'sync_error'
           for (const i of group.upserts) {
-            const ids = entityToOutboxIds.get(i.entity_id) ?? []
+            const entityKey = `${i.table_name}:${i.entity_id}`
+            const ids = entityKeyToOutboxIds.get(entityKey) ?? []
             for (const id of ids) {
               const item = pending.find((x) => x.id === id)
               if (item) await markOutboxError(item, message)
@@ -155,12 +158,14 @@ export async function syncNow() {
           const { error } = await supabase.from(table).delete().in('id', idsToDelete)
           if (error) throw error
           for (const i of group.deletes) {
-            successOutboxIds.push(...(entityToOutboxIds.get(i.entity_id) ?? []))
+            const entityKey = `${i.table_name}:${i.entity_id}`
+            successOutboxIds.push(...(entityKeyToOutboxIds.get(entityKey) ?? []))
           }
         } catch (e) {
           const message = e instanceof Error ? e.message : 'sync_error'
           for (const i of group.deletes) {
-            const ids = entityToOutboxIds.get(i.entity_id) ?? []
+            const entityKey = `${i.table_name}:${i.entity_id}`
+            const ids = entityKeyToOutboxIds.get(entityKey) ?? []
             for (const id of ids) {
               const item = pending.find((x) => x.id === id)
               if (item) await markOutboxError(item, message)
