@@ -39,6 +39,16 @@ export default function AppShell({ children }: PropsWithChildren) {
     if (online) void syncNow()
   }, [online])
 
+  // Sync automático en segundo plano cuando se detectan tareas pendientes en el outbox
+  useEffect(() => {
+    if (online && outboxCount > 0 && !syncing) {
+      const timer = setTimeout(() => {
+        void onSync()
+      }, 1500) // Se espera 1.5s para agrupar operaciones rápidas y evitar saturar la base de datos
+      return () => clearTimeout(timer)
+    }
+  }, [online, outboxCount, syncing])
+
   useEffect(() => {
     const handler = () => { setIsCreatingNew(true); setConfigOpen(true); }
     document.addEventListener('open-create-trip', handler)
