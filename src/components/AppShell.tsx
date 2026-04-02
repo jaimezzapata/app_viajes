@@ -58,7 +58,7 @@ export default function AppShell({ children }: PropsWithChildren) {
   const isHome = location.pathname === '/inicio'
 
   useEffect(() => {
-    if (!isHome && activeTripId === null) {
+    if (!isHome && !activeTripId) {
       navigate('/inicio', { replace: true })
     }
   }, [isHome, activeTripId, navigate])

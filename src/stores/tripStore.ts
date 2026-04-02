@@ -142,8 +142,8 @@ export const useTripStore = create<TripState>()(
             })
             .filter(Boolean)
         }
-        if (!next.activeTripId) {
-          next.activeTripId = '00000000-0000-0000-0000-000000000001'
+        if (!next.activeTripId || next.activeTripId === '00000000-0000-0000-0000-000000000001') {
+          next.activeTripId = null
         }
         return next
       },
