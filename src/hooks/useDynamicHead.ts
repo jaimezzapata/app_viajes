@@ -15,7 +15,9 @@ export function useDynamicHead(title: string, iconName: string) {
     const svgMarkup = renderToStaticMarkup(svgComponent)
     
     // Create valid standalone SVG by injecting xmlns if missing
-    const validSvg = svgMarkup.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
+    const validSvg = svgMarkup.includes('xmlns=') 
+      ? svgMarkup 
+      : svgMarkup.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')
 
     const faviconUrl = `data:image/svg+xml,${encodeURIComponent(validSvg)}`
 

@@ -9,6 +9,7 @@ import AnimatedIcon from '@/components/AnimatedIcon'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, WifiOff } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnline } from '@/hooks/useOnline'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
 
 type DaySummary = {
   ymd: string
@@ -20,6 +21,7 @@ type DaySummary = {
 }
 
 export default function Calendar() {
+  useDynamicHead('Calendario', 'CalendarDays')
   const tripStartYmd = useTripStore((s) => s.tripStartYmd)
   const selectedYmd = useTripStore((s) => s.selectedYmd)
   const setSelectedYmd = useTripStore((s) => s.setSelectedYmd)
@@ -250,13 +252,27 @@ export default function Calendar() {
                     if (!isActive) return
                     setSelectedYmd(cell.ymd)
                   }}
-                  className={[
-                    'h-[92px] rounded-xl border px-2 py-2 text-left transition-colors flex flex-col shadow-sm shadow-black/20 overflow-hidden',
-                    cell.inMonth ? 'bg-zinc-950/55' : 'bg-zinc-950/20',
-                    isActive ? 'border-zinc-800/60 hover:bg-zinc-900/35 hover:border-zinc-700/70' : 'border-zinc-900/40 opacity-30 cursor-default',
-                    isSelected ? 'ring-2 ring-sky-500/20 border-sky-500/35 bg-sky-500/5' : '',
-                    todayInTrip && cell.ymd === todayYmd ? 'border-amber-500/35 bg-amber-500/5' : '',
-                  ].join(' ')}
+                  className={(() => {
+                    const isToday = todayInTrip && cell.ymd === todayYmd
+                    let bg = cell.inMonth ? 'bg-zinc-950/55' : 'bg-zinc-950/20'
+                    let border = isActive ? 'border-zinc-800/60' : 'border-zinc-900/40'
+                    let hover = isActive ? 'hover:bg-zinc-900/35 hover:border-zinc-700/70' : 'opacity-30 cursor-default'
+
+                    if (isSelected) {
+                      bg = 'bg-sky-500/10'
+                      border = 'border-sky-500/50 ring-2 ring-sky-500/20'
+                      hover = ''
+                    } else if (isToday) {
+                      bg = 'bg-amber-500/10'
+                      border = 'border-amber-500/40'
+                      hover = isActive ? 'hover:bg-amber-500/20 hover:border-amber-500/60' : hover
+                    }
+
+                    return [
+                      'h-[92px] rounded-xl border px-2 py-2 text-left transition-colors flex flex-col shadow-sm shadow-black/20 overflow-hidden',
+                      bg, border, hover
+                    ].filter(Boolean).join(' ')
+                  })()}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5">
