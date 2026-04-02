@@ -402,21 +402,44 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   async function handleDeleteTrip() {
     if (!activeTripId || isNew) return
     const ts = nowIso()
-    const trip = await db.viajes.get(activeTripId)
-    if (!trip) return
-    
-    // soft delete
-    const nextTrip = { ...trip, deleted_at: ts, updated_at: ts }
-    await db.viajes.put(nextTrip)
-    await db.outbox.add({
-      id: newId(),
-      table_name: 'viajes',
-      op: 'UPSERT',
-      entity_id: activeTripId,
-      payload: nextTrip,
-      created_at: ts,
-      try_count: 0,
-      last_error: null,
+    // hard delete the trip and related local entities
+    await db.transaction('rw', [db.viajes, db.gastos, db.itinerarios, db.actividades, db.hospedajes, db.presupuestos, db.outbox], async () => {
+      await db.viajes.delete(activeTripId)
+      await db.outbox.add({
+        id: newId(),
+        table_name: 'viajes',
+        op: 'DELETE',
+        entity_id: activeTripId,
+        payload: null,
+        created_at: ts,
+        try_count: 0,
+        last_error: null,
+      })
+      
+      const tables = [
+        { t: db.gastos, name: 'gastos' },
+        { t: db.itinerarios, name: 'itinerarios' },
+        { t: db.actividades, name: 'actividades' },
+        { t: db.hospedajes, name: 'hospedajes' },
+        { t: db.presupuestos, name: 'presupuestos' }
+      ]
+      
+      for (const table of tables) {
+        const items = await table.t.where('trip_id').equals(activeTripId).toArray()
+        for (const item of items) {
+          await table.t.delete(item.id)
+          await db.outbox.add({
+            id: newId(),
+            table_name: table.name as any,
+            op: 'DELETE',
+            entity_id: item.id,
+            payload: null,
+            created_at: ts,
+            try_count: 0,
+            last_error: null,
+          })
+        }
+      }
     })
     
     // Find next fallback trip
