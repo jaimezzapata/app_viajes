@@ -4,7 +4,7 @@ import type { OutboxItem } from '@/../shared/types'
 import { nowIso } from '@/utils/id'
 
 type PullSpec = {
-  table: 'categorias' | 'gastos' | 'itinerarios' | 'hospedajes' | 'presupuestos'
+  table: 'categorias' | 'gastos' | 'itinerarios' | 'hospedajes' | 'presupuestos' | 'viajes' | 'actividades'
   select: string
 }
 
@@ -14,6 +14,8 @@ const PULL_SPECS: PullSpec[] = [
   { table: 'itinerarios', select: '*' },
   { table: 'hospedajes', select: '*' },
   { table: 'presupuestos', select: '*' },
+  { table: 'viajes', select: '*' },
+  { table: 'actividades', select: '*' },
 ]
 
 async function markOutboxError(item: OutboxItem, message: string) {
@@ -61,6 +63,9 @@ export async function syncNow() {
   if (!supabase) return
   if (!navigator.onLine) return
 
+  const { data: authData } = await supabase.auth.getSession()
+  const uid = authData?.session?.user?.id
+
   await setLastSyncError(null)
   await db.sync_state.put({ key: 'last_sync_attempt_at', value: nowIso() })
 
@@ -68,7 +73,12 @@ export async function syncNow() {
   for (const item of pending) {
     try {
       if (item.op === 'UPSERT') {
-        const { error } = await supabase.from(item.table_name).upsert(item.payload as never)
+        const payloadToUpload = { ...(item.payload as Record<string, unknown>) }
+        if (uid && typeof payloadToUpload === 'object' && ('user_id' in payloadToUpload) && !payloadToUpload.user_id) {
+          payloadToUpload.user_id = uid
+        }
+
+        const { error } = await supabase.from(item.table_name).upsert(payloadToUpload as never)
         if (error) throw error
       }
       if (item.op === 'DELETE') {
