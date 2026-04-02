@@ -456,10 +456,6 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
     const fallbackId = trips.length > 0 ? trips[0].id : null
     
     setActiveTripId(fallbackId)
-    if (!fallbackId) {
-      // Avoid null breaking the ui immediately
-      useTripStore.getState().setActiveTripId('00000000-0000-0000-0000-000000000001')
-    }
     
     setDeleteWarningOpen(false)
     onClose()
