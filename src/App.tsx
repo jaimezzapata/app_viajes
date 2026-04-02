@@ -14,6 +14,7 @@ import Itinerary from '@/pages/Itinerary'
 import Lodging from '@/pages/Lodging'
 import Activities from '@/pages/Activities'
 import Reports from '@/pages/Reports'
+import Home from '@/pages/Home'
 
 function TripSyncer() {
   const activeTripId = useTripStore((s) => s.activeTripId)
@@ -89,14 +90,15 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Navigate to="/calendario" replace />} />
+        <Route path="/" element={<Navigate to="/inicio" replace />} />
+        <Route path="/inicio" element={<Home />} />
         <Route path="/calendario" element={<Calendar />} />
         <Route path="/gastos" element={<Expenses />} />
         <Route path="/itinerario" element={<Itinerary />} />
         <Route path="/actividades" element={<Activities />} />
         <Route path="/hospedaje" element={<Lodging />} />
         <Route path="/reportes" element={<Reports />} />
-        <Route path="*" element={<Navigate to="/calendario" replace />} />
+        <Route path="*" element={<Navigate to="/inicio" replace />} />
       </Routes>
     </AnimatePresence>
   )
