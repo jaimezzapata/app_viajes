@@ -22,6 +22,7 @@ export default function AppShell({ children }: PropsWithChildren) {
   const tripEndYmd = useTripStore((s) => s.tripEndYmd)
   const segments = useTripStore((s) => s.segments)
   const countries = useTripStore((s) => s.countries)
+  const activeTripId = useTripStore((s) => s.activeTripId)
 
   const { value: outboxCount } = useLiveQuery<number>(async () => await db.outbox.count(), [], 0)
   const { value: categoryCount } = useLiveQuery<number>(async () => await db.categorias.count(), [], 0)
@@ -87,15 +88,14 @@ export default function AppShell({ children }: PropsWithChildren) {
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
-              {import.meta.env.DEV && categoryCount === 0 ? (
-                <button
-                  className="rounded-xl bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-400"
-                  type="button"
-                  onClick={() => void onResetLocal()}
-                >
-                  Hard Reset
-                </button>
-              ) : null}
+              <button
+                className="flex items-center justify-center rounded-xl bg-orange-500/10 px-3 py-1.5 text-[11px] font-semibold text-orange-400 transition-colors hover:bg-orange-500/20"
+                type="button"
+                onClick={() => void onResetLocal()}
+                title="Limpiar memoria local"
+              >
+                Limpiar datos
+              </button>
               <button
                 className="flex items-center justify-center rounded-xl bg-zinc-900 px-3 py-1.5 text-[11px] font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
                 type="button"
@@ -117,7 +117,7 @@ export default function AppShell({ children }: PropsWithChildren) {
           </div>
 
           <div className="mt-3 rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-2.5">
-            <TripSummary tripStartYmd={tripStartYmd} tripEndYmd={tripEndYmd} segments={segments} countries={countries} onConfigure={() => { setIsCreatingNew(false); setConfigOpen(true) }} />
+            <TripSummary activeTripId={activeTripId} tripStartYmd={tripStartYmd} tripEndYmd={tripEndYmd} segments={segments} countries={countries} onConfigure={() => { setIsCreatingNew(false); setConfigOpen(true) }} />
           </div>
 
           {lastSyncError ? <div className="mt-2 rounded-xl border border-rose-900/50 bg-rose-950/30 px-3 py-2 text-[10px] text-rose-200">Error: {lastSyncError}</div> : null}
@@ -154,7 +154,7 @@ function TripSelector({ onConfigure }: { onConfigure: (isNew?: boolean) => void 
         }}
         className="max-w-[140px] truncate rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-sky-400 outline-none hover:bg-zinc-800 focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50"
       >
-        {trips.length === 0 ? <option value="fallback">Mi Primer Viaje</option> : null}
+        {trips.length === 0 ? <option value="">(Sin viajes)</option> : null}
         {trips.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
@@ -169,12 +169,14 @@ function TripSelector({ onConfigure }: { onConfigure: (isNew?: boolean) => void 
 }
 
 function TripSummary({
+  activeTripId,
   tripStartYmd,
   tripEndYmd,
   segments,
   countries,
   onConfigure,
 }: {
+  activeTripId: string | null
   tripStartYmd: string
   tripEndYmd: string
   segments: Array<{ fromStage: string; toStage: string; startYmd: string; endYmd: string }>
@@ -191,7 +193,8 @@ function TripSummary({
     .map((s) => `${byCode.get(s.fromStage)?.acronym ?? s.fromStage}→${byCode.get(s.toStage)?.acronym ?? s.toStage}`)
     .join(' · ')
 
-  if (!tripOk) {
+  if (!activeTripId || !tripOk) {
+    if (!activeTripId) return <div className="mt-0.5 text-[11px] text-zinc-500 font-medium">Ningún viaje seleccionado</div>
     return <div className="mt-0.5 text-[11px] text-rose-300">Viaje: sin fechas</div>
   }
 
