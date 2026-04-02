@@ -45,6 +45,14 @@ export default function AppShell({ children }: PropsWithChildren) {
     return () => document.removeEventListener('open-create-trip', handler)
   }, [])
 
+  const isHome = location.pathname === '/inicio'
+
+  useEffect(() => {
+    if (!isHome && activeTripId === null) {
+      navigate('/inicio', { replace: true })
+    }
+  }, [isHome, activeTripId, navigate])
+
   async function onSync() {
     if (!online) return
     setSyncing(true)
@@ -67,8 +75,6 @@ export default function AppShell({ children }: PropsWithChildren) {
   async function handleSignOut() {
     await supabase.auth.signOut()
   }
-
-  const isHome = location.pathname === '/inicio'
 
   return (
     <div className={`min-h-dvh bg-zinc-950 text-zinc-100 ${!isHome ? 'pb-20' : ''}`}>
