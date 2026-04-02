@@ -31,6 +31,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   const [editingCountryCode, setEditingCountryCode] = useState<string | null>(null)
   const [renamedCodes, setRenamedCodes] = useState<Record<string, string>>({})
   const [deleteWarningOpen, setDeleteWarningOpen] = useState(false)
+  const [editingSegData, setEditingSegData] = useState<{ mode: 'add'|'edit', seg: TripSegment } | null>(null)
   
   const [step, setStep] = useState<'config' | 'budget'>('config')
   const [initialBudget, setInitialBudget] = useState('')
@@ -45,6 +46,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
     if (!open) return
     setStep('config')
     setInitialBudget('')
+    setEditingSegData(null)
     if (isNew) {
       setTripName('Nuevo Viaje')
       const today = new Date()
@@ -80,7 +82,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
     setLocalSegments((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
   }
 
-  function addSeg() {
+  function openAddSeg() {
     const last = localSegments[localSegments.length - 1]
     const baseStart = last?.endYmd ?? localStartYmd
     const id = `seg_${newId().slice(0, 8)}`
@@ -93,11 +95,20 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       startYmd: baseStart,
       endYmd: baseStart,
     }
-    setLocalSegments((prev) => {
-      const next = [...prev, seg]
-      setTimeout(() => segmentsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
-      return next
-    })
+    setEditingSegData({ mode: 'add', seg })
+  }
+
+  function saveSeg(seg: TripSegment) {
+    if (editingSegData?.mode === 'add') {
+      setLocalSegments((prev) => {
+        const next = [...prev, seg]
+        setTimeout(() => segmentsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
+        return next
+      })
+    } else {
+      setLocalSegments((prev) => prev.map(s => s.id === seg.id ? seg : s))
+    }
+    setEditingSegData(null)
   }
 
   function removeSeg(id: string) {
@@ -617,7 +628,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                 <button
                   className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-100 hover:bg-zinc-800"
                   type="button"
-                  onClick={addSeg}
+                  onClick={openAddSeg}
                 >
                   Agregar
                 </button>
@@ -629,75 +640,35 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                 ) : null}
 
                 {localSegments.map((seg, idx) => (
-                  <div key={seg.id} className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-medium text-zinc-300">Tramo {idx + 1} · {countryShort(localCountries, seg.fromStage)} → {countryShort(localCountries, seg.toStage)}</div>
-                      <button className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" type="button" onClick={() => removeSeg(seg.id)}>
-                        Quitar
-                      </button>
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {stageOptions.map((o) => {
-                        const active = seg.fromStage === o.stage
-                        return (
-                          <button
-                            key={o.stage}
-                            type="button"
-                            className={
-                              'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
-                              (active
-                                ? 'border-sky-500 bg-sky-500/10 text-zinc-50'
-                                : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
-                            }
-                            onClick={() => updateSeg(seg.id, { fromStage: o.stage as TripStage })}
-                          >
-                            <div className="text-base leading-none">{o.flag}</div>
-                            <div className="max-w-full truncate leading-none">{o.label}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {stageOptions.map((o) => {
-                        const active = seg.toStage === o.stage
-                        return (
-                          <button
-                            key={o.stage}
-                            type="button"
-                            className={
-                              'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
-                              (active
-                                ? 'border-emerald-500 bg-emerald-500/10 text-zinc-50'
-                                : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
-                            }
-                            onClick={() => updateSeg(seg.id, { toStage: o.stage as TripStage })}
-                          >
-                            <div className="text-base leading-none">{o.flag}</div>
-                            <div className="max-w-full truncate leading-none">{o.label}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <Field label="Desde">
-                        <input
-                          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                          type="date"
-                          value={seg.startYmd}
-                          onChange={(e) => updateSeg(seg.id, { startYmd: e.target.value })}
-                        />
-                      </Field>
-                      <Field label="Hasta">
-                        <input
-                          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                          type="date"
-                          value={seg.endYmd}
-                          onChange={(e) => updateSeg(seg.id, { endYmd: e.target.value })}
-                        />
-                      </Field>
+                  <div key={seg.id} className="group relative overflow-hidden rounded-2xl border border-zinc-900/80 bg-zinc-950/50 hover:bg-zinc-900/60 transition-colors">
+                    <div 
+                      className="flex items-center justify-between p-3 cursor-pointer"
+                      onClick={() => setEditingSegData({ mode: 'edit', seg })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-xs font-bold text-zinc-500 group-hover:bg-sky-500/10 group-hover:text-sky-400 transition-colors">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                            <span className="truncate">{countryShort(localCountries, seg.fromStage)}</span>
+                            <span className="text-zinc-600">→</span>
+                            <span className="truncate">{countryShort(localCountries, seg.toStage)}</span>
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-zinc-500">
+                            {seg.startYmd.substring(5)} al {seg.endYmd.substring(5)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button 
+                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/20" 
+                          type="button" 
+                          onClick={(e) => { e.stopPropagation(); removeSeg(seg.id) }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -816,6 +787,105 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
           </motion.div>
         </motion.div>
       ) : null}
+
+      {editingSegData && (
+        <motion.div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setEditingSegData(null)}
+        >
+          <motion.div
+            className="flex w-full max-w-sm flex-col rounded-t-3xl border border-zinc-900 bg-zinc-950 p-5 shadow-2xl"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-lg font-bold text-white">
+                {editingSegData.mode === 'add' ? 'Agregar tramo' : 'Editar tramo'}
+              </div>
+              <button 
+                className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800" 
+                onClick={() => setEditingSegData(null)}
+                type="button"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-2xl border border-sky-900/30 bg-sky-500/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-sky-400">Origen</div>
+              <div className="grid grid-cols-3 gap-2">
+                {stageOptions.map((o) => {
+                  const active = editingSegData.seg.fromStage === o.stage
+                  return (
+                    <button
+                      key={o.stage}
+                      type="button"
+                      className={`flex w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-xs transition-colors ${active ? 'border-sky-500 bg-sky-500/20 text-sky-100 shadow-md shadow-sky-900/20' : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:bg-zinc-900'}`}
+                      onClick={() => setEditingSegData({ ...editingSegData, seg: { ...editingSegData.seg, fromStage: o.stage as TripStage } })}
+                    >
+                      <div className="text-base leading-none">{o.flag}</div>
+                      <div className="max-w-full truncate text-[10px] leading-none mt-1">{o.label}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-2xl border border-emerald-900/30 bg-emerald-500/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-emerald-400">Destino</div>
+              <div className="grid grid-cols-3 gap-2">
+                {stageOptions.map((o) => {
+                  const active = editingSegData.seg.toStage === o.stage
+                  return (
+                    <button
+                      key={o.stage}
+                      type="button"
+                      className={`flex w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-xs transition-colors ${active ? 'border-emerald-500 bg-emerald-500/20 text-emerald-100 shadow-md shadow-emerald-900/20' : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:bg-zinc-900'}`}
+                      onClick={() => setEditingSegData({ ...editingSegData, seg: { ...editingSegData.seg, toStage: o.stage as TripStage } })}
+                    >
+                      <div className="text-base leading-none">{o.flag}</div>
+                      <div className="max-w-full truncate text-[10px] leading-none mt-1">{o.label}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              <Field label="Desde">
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                  type="date"
+                  value={editingSegData.seg.startYmd}
+                  onChange={(e) => setEditingSegData({ ...editingSegData, seg: { ...editingSegData.seg, startYmd: e.target.value } })}
+                />
+              </Field>
+              <Field label="Hasta">
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  type="date"
+                  value={editingSegData.seg.endYmd}
+                  onChange={(e) => setEditingSegData({ ...editingSegData, seg: { ...editingSegData.seg, endYmd: e.target.value } })}
+                />
+              </Field>
+            </div>
+
+            <button
+              className="w-full rounded-xl bg-sky-500 py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 hover:bg-sky-400 active:scale-[0.98] transition-transform"
+              type="button"
+              onClick={() => saveSeg(editingSegData.seg)}
+            >
+              Guardar tramo
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   )
 }
