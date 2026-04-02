@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Ticket, Camera, Utensils, ShoppingBag, MapPin, Map as MapIcon, HelpCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useMemo } from 'react'
 import Page from '@/components/Page'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
@@ -14,9 +13,12 @@ import { useOnline } from '@/hooks/useOnline'
 import { WifiOff } from 'lucide-react'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import FlagAvatar from '@/components/FlagAvatar'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function Activities() {
   useDynamicHead('Actividades', 'Ticket')
+  const location = useLocation()
+  const navigate = useNavigate()
   const activeTripId = useTripStore((s) => s.activeTripId)
   const countries = useTripStore((s) => s.countries)
   const online = useOnline()
@@ -33,6 +35,19 @@ export default function Activities() {
     [activeTripId],
     [],
   )
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('edit')
+    if (!id) return
+    if (!activeTripId) return
+    void db.actividades.get(id).then((a) => {
+      if (!a || a.deleted_at) return
+      if (a.trip_id !== activeTripId) return
+      setEditingItem(a)
+      setModalOpen(true)
+      navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    })
+  }, [activeTripId, location.pathname, location.search, navigate])
 
   const stageOptions = useMemo(
     () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),

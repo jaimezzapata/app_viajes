@@ -14,14 +14,18 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import { normalizeCountryFlag } from '@/utils/flags'
 import FlagAvatar from '@/components/FlagAvatar'
+import { exportTripBackup, importTripBackup, type TripBackupV1 } from '@/utils/tripBackup'
+import { useNavigate } from 'react-router-dom'
 
 export default function Reports() {
   useDynamicHead('Reportes', 'BarChart3')
+  const navigate = useNavigate()
   const online = useOnline()
   const countries = useTripStore((s) => s.countries)
   const activeTripId = useTripStore((s) => s.activeTripId)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const handleExport = useCallback(async (format: 'pdf' | 'excel') => {
     if (!activeTripId) return
@@ -42,6 +46,47 @@ export default function Reports() {
     }
   }, [activeTripId, countries])
 
+  const handleExportBackup = useCallback(async () => {
+    if (!activeTripId) return
+    setExporting(true)
+    setDownloadOpen(false)
+    try {
+      const backup = await exportTripBackup(activeTripId)
+      const json = JSON.stringify(backup, null, 2)
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `viaje-backup-${activeTripId}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Error exportando backup. Revisa la consola.')
+    } finally {
+      setExporting(false)
+    }
+  }, [activeTripId])
+
+  const handleImportBackupFile = useCallback(async (file: File) => {
+    setExporting(true)
+    setDownloadOpen(false)
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as TripBackupV1
+      const newTripId = await importTripBackup(parsed)
+      alert(`Backup importado. Se creó un nuevo viaje: ${newTripId}`)
+      await syncNow()
+    } catch (err) {
+      console.error(err)
+      alert('Error importando backup. Verifica que el archivo JSON sea válido.')
+    } finally {
+      setExporting(false)
+    }
+  }, [])
+
   const { value: categories = [] } = useLiveQuery<AppCategory[]>(async () => await db.categorias.filter((c) => c.deleted_at == null).toArray(), [], [])
   const { value: expenses = [] } = useLiveQuery<AppExpense[]>(
     async () => {
@@ -54,7 +99,7 @@ export default function Reports() {
   const { value: budgets = [] } = useLiveQuery<AppBudget[]>(
     async () => {
       if (!activeTripId) return []
-      return await db.presupuestos.where('trip_id').equals(activeTripId).filter((b) => b.deleted_at == null && b.stage === 'GLOBAL' && b.category_id == null).toArray()
+      return await db.presupuestos.where('trip_id').equals(activeTripId).filter((b) => b.deleted_at == null).toArray()
     },
     [activeTripId],
     [],
@@ -89,9 +134,75 @@ export default function Reports() {
     return map
   }, [categoryById, expenses])
 
-  const budgetTotal = useMemo(() => budgets.find((b) => b.category_id == null)?.amount_cop ?? 0, [budgets])
+  const budgetTotal = useMemo(() => budgets.find((b) => b.stage === 'GLOBAL' && b.category_id == null)?.amount_cop ?? 0, [budgets])
 
   const remainingTotal = useMemo(() => Math.max(0, budgetTotal - spentTotal), [budgetTotal, spentTotal])
+
+  const budgetByStage = useMemo(() => {
+    const map = new Map<CountryStage, number>()
+    for (const b of budgets) {
+      if (b.deleted_at != null) continue
+      if (b.category_id != null) continue
+      if (b.stage === 'GLOBAL') continue
+      map.set(b.stage as CountryStage, (map.get(b.stage as CountryStage) ?? 0) + b.amount_cop)
+    }
+    return map
+  }, [budgets])
+
+  const budgetByKind = useMemo(() => {
+    const map: Record<CategoryKind, number> = {
+      HOSPEDAJE: 0,
+      TRANSPORTE: 0,
+      COMIDA: 0,
+      ENTRETENIMIENTO: 0,
+      SOUVENIRES: 0,
+      OTROS: 0,
+    }
+    for (const b of budgets) {
+      if (b.deleted_at != null) continue
+      if (!b.category_id) continue
+      if (b.stage !== 'GLOBAL') continue
+      const cat = categoryById.get(b.category_id)
+      if (!cat) continue
+      map[cat.kind] += b.amount_cop
+    }
+    return map
+  }, [budgets, categoryById])
+
+  const topExpenses = useMemo(() => {
+    return expenses
+      .slice()
+      .sort((a, b) => (b.amount_cop ?? 0) - (a.amount_cop ?? 0))
+      .slice(0, 10)
+  }, [expenses])
+
+  const overspentStages = useMemo(() => {
+    const res: Array<{ stage: CountryStage; spent: number; budget: number }> = []
+    for (const [stage, budget] of budgetByStage.entries()) {
+      const spent = spentByStage.get(stage) ?? 0
+      if (budget > 0 && spent > budget) res.push({ stage, spent, budget })
+    }
+    return res
+  }, [budgetByStage, spentByStage])
+
+  const overspentKinds = useMemo(() => {
+    const res: Array<{ kind: CategoryKind; spent: number; budget: number }> = []
+    for (const kind of Object.keys(CATEGORY_KIND_LABEL) as CategoryKind[]) {
+      const budget = budgetByKind[kind] ?? 0
+      const spent = spentByKind[kind] ?? 0
+      if (budget > 0 && spent > budget) res.push({ kind, spent, budget })
+    }
+    return res
+  }, [budgetByKind, spentByKind])
+
+  const missingFxCurrencies = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of expenses) {
+      if (e.currency === 'COP') continue
+      if (!Number.isFinite(e.fx_rate_to_cop) || e.fx_rate_to_cop <= 1) set.add(e.currency)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [expenses])
 
   async function upsertGlobalBudget(amount_cop: number) {
     if (!activeTripId) return
@@ -165,6 +276,28 @@ export default function Reports() {
                     className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-2xl border border-zinc-800 bg-zinc-900 p-2 shadow-xl shadow-black/50"
                   >
                     <button
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
+                      onClick={() => void handleExportBackup()}
+                    >
+                      <Download className="h-4 w-4 text-sky-400" />
+                      <div>
+                        <div>Backup (JSON)</div>
+                        <div className="text-[10px] text-zinc-500 font-normal">Exporta viaje completo</div>
+                      </div>
+                    </button>
+                    <button
+                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
+                      onClick={() => importRef.current?.click()}
+                      type="button"
+                    >
+                      <Download className="h-4 w-4 text-sky-400 rotate-180" />
+                      <div>
+                        <div>Importar backup</div>
+                        <div className="text-[10px] text-zinc-500 font-normal">Restaura desde JSON</div>
+                      </div>
+                    </button>
+                    <div className="my-2 h-px bg-zinc-800" />
+                    <button
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
                       onClick={() => handleExport('pdf')}
                     >
@@ -189,6 +322,17 @@ export default function Reports() {
               )}
             </AnimatePresence>
           </div>
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) void handleImportBackupFile(file)
+            }}
+          />
           <button
             className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900 disabled:opacity-50"
             onClick={() => void syncNow()}
@@ -196,6 +340,13 @@ export default function Reports() {
             disabled={!online}
           >
             Sincronizar
+          </button>
+          <button
+            className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
+            onClick={() => navigate('/diagnostico')}
+            type="button"
+          >
+            Diagnóstico
           </button>
         </div>
       </div>
@@ -232,6 +383,69 @@ export default function Reports() {
           </div>
         </div>
 
+        {(budgetByStage.size > 0 || Object.values(budgetByKind).some((v) => v > 0)) ? (
+          <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+            <div className="text-sm font-semibold">Presupuesto vs gastado</div>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              {budgetByStage.size > 0 ? (
+                <div className="rounded-2xl border border-zinc-900 bg-zinc-950/50 p-3">
+                  <div className="text-xs font-semibold text-zinc-300">Por país</div>
+                  <div className="mt-2 space-y-2">
+                    {Array.from(budgetByStage.entries()).map(([stage, budget]) => {
+                      const spent = spentByStage.get(stage) ?? 0
+                      const pct = budget > 0 ? Math.min(1, spent / budget) : 0
+                      const label = stageOptions.find((o) => o.stage === stage)?.label ?? stage
+                      const cca2 = stageOptions.find((o) => o.stage === stage)?.cca2
+                      return (
+                        <div key={stage} className="rounded-xl border border-zinc-900 bg-zinc-950/40 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {cca2 ? <FlagAvatar cca2={cca2} className="h-5 w-7" /> : null}
+                              <div className="text-xs font-semibold text-zinc-200 truncate">{label}</div>
+                            </div>
+                            <div className={`text-xs font-semibold ${spent > budget ? 'text-rose-300' : 'text-zinc-300'}`}>
+                              {formatCop(spent)} / {formatCop(budget)}
+                            </div>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-900">
+                            <div className={`h-2 ${spent > budget ? 'bg-rose-500/70' : 'bg-emerald-500/70'}`} style={{ width: `${pct * 100}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {Object.values(budgetByKind).some((v) => v > 0) ? (
+                <div className="rounded-2xl border border-zinc-900 bg-zinc-950/50 p-3">
+                  <div className="text-xs font-semibold text-zinc-300">Por categoría</div>
+                  <div className="mt-2 space-y-2">
+                    {(Object.keys(CATEGORY_KIND_LABEL) as CategoryKind[]).filter((k) => (budgetByKind[k] ?? 0) > 0).map((k) => {
+                      const budget = budgetByKind[k] ?? 0
+                      const spent = spentByKind[k] ?? 0
+                      const pct = budget > 0 ? Math.min(1, spent / budget) : 0
+                      return (
+                        <div key={k} className="rounded-xl border border-zinc-900 bg-zinc-950/40 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-zinc-200 truncate">{CATEGORY_KIND_LABEL[k]}</div>
+                            <div className={`text-xs font-semibold ${spent > budget ? 'text-rose-300' : 'text-zinc-300'}`}>
+                              {formatCop(spent)} / {formatCop(budget)}
+                            </div>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-900">
+                            <div className={`h-2 ${spent > budget ? 'bg-rose-500/70' : 'bg-emerald-500/70'}`} style={{ width: `${pct * 100}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
           <div className="text-sm font-semibold">Gasto por categoría</div>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -245,6 +459,81 @@ export default function Reports() {
                 variant="category"
               />
             ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+          <div className="text-sm font-semibold">Alertas</div>
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            {budgetTotal > 0 && spentTotal > budgetTotal ? (
+              <div className="rounded-2xl border border-rose-900/50 bg-rose-950/30 p-3 text-sm text-rose-200">
+                Presupuesto global excedido: {formatCop(spentTotal)} / {formatCop(budgetTotal)}
+              </div>
+            ) : null}
+            {overspentStages.length > 0 ? (
+              <div className="rounded-2xl border border-rose-900/50 bg-rose-950/30 p-3">
+                <div className="text-sm font-semibold text-rose-200">Países excedidos</div>
+                <div className="mt-2 space-y-1">
+                  {overspentStages.map((s) => (
+                    <div key={s.stage} className="flex items-center justify-between text-xs text-rose-200">
+                      <span>{stageOptions.find((o) => o.stage === s.stage)?.label ?? s.stage}</span>
+                      <span>{formatCop(s.spent)} / {formatCop(s.budget)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {overspentKinds.length > 0 ? (
+              <div className="rounded-2xl border border-rose-900/50 bg-rose-950/30 p-3">
+                <div className="text-sm font-semibold text-rose-200">Categorías excedidas</div>
+                <div className="mt-2 space-y-1">
+                  {overspentKinds.map((k) => (
+                    <div key={k.kind} className="flex items-center justify-between text-xs text-rose-200">
+                      <span>{CATEGORY_KIND_LABEL[k.kind]}</span>
+                      <span>{formatCop(k.spent)} / {formatCop(k.budget)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {missingFxCurrencies.length > 0 ? (
+              <div className="rounded-2xl border border-amber-900/50 bg-amber-950/30 p-3 text-sm text-amber-200">
+                Tasas FX posiblemente faltantes para: {missingFxCurrencies.join(', ')}
+              </div>
+            ) : null}
+            {budgetTotal <= 0 && budgets.length === 0 ? (
+              <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3 text-sm text-zinc-400">
+                Configura un presupuesto para recibir alertas.
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+          <div className="text-sm font-semibold">Top 10 gastos</div>
+          <div className="mt-3 space-y-2">
+            {topExpenses.length === 0 ? (
+              <div className="text-sm text-zinc-400">No hay gastos todavía.</div>
+            ) : (
+              topExpenses.map((e) => {
+                const cat = categoryById.get(e.category_id)
+                const stage = stageOptions.find((o) => o.stage === e.stage)
+                return (
+                  <div key={e.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-900 bg-zinc-950/50 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        {stage?.cca2 ? <FlagAvatar cca2={stage.cca2} className="h-5 w-7" /> : null}
+                        <div className="text-xs font-semibold text-zinc-200 truncate">{e.description || cat?.name || 'Gasto'}</div>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-zinc-500">
+                        {e.date} · {cat?.name ?? 'Sin categoría'}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-sm font-bold text-zinc-100">{formatCop(e.amount_cop)}</div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
       </div>

@@ -23,6 +23,8 @@ export default function ExpenseModal({
   isEditing,
   onDelete,
   restrictedKinds,
+  mirrorType,
+  onOpenMirrorSource,
 }: {
   open: boolean
   onClose: () => void
@@ -37,6 +39,8 @@ export default function ExpenseModal({
   isEditing?: boolean
   onDelete?: () => void
   restrictedKinds?: ExpenseFormState['categoryKind'][]
+  mirrorType?: 'itinerario' | 'hospedaje' | 'actividad' | null
+  onOpenMirrorSource?: () => void
 }) {
   const countries = useTripStore((s) => s.countries)
   const segments = useTripStore((s) => s.segments)
@@ -111,6 +115,10 @@ export default function ExpenseModal({
     }
     return map
   }, [categories])
+
+  const isMirror = !!mirrorType
+  const mirrorLabel =
+    mirrorType === 'itinerario' ? 'ruta' : mirrorType === 'hospedaje' ? 'hospedaje' : mirrorType === 'actividad' ? 'actividad' : null
 
   const kindOptions = useMemo(() => {
     const all = Object.keys(CATEGORY_KIND_LABEL) as ExpenseFormState['categoryKind'][]
@@ -188,7 +196,9 @@ export default function ExpenseModal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-semibold">{isEditing ? 'Editar gasto' : 'Nuevo gasto'}</div>
+              <div className="text-sm font-semibold">
+                {isEditing ? (isMirror && mirrorLabel ? `Editar ${mirrorLabel} (gasto)` : 'Editar gasto') : 'Nuevo gasto'}
+              </div>
               <button 
                 className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900" 
                 onClick={() => {
@@ -200,6 +210,25 @@ export default function ExpenseModal({
                 Cerrar
               </button>
             </div>
+
+            {isEditing && isMirror && mirrorLabel ? (
+              <div className="mb-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-zinc-400">
+                    Este es un gasto espejo. Edita el {mirrorLabel} desde su pantalla.
+                  </div>
+                  {onOpenMirrorSource ? (
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-xl bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 hover:bg-sky-500/20"
+                      onClick={onOpenMirrorSource}
+                    >
+                      Editar {mirrorLabel}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mb-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -215,6 +244,7 @@ export default function ExpenseModal({
                       setForm((f) => ({ ...f, stageMode: 'AUTO' }))
                       setStageWithCurrency(derivedStage)
                     }}
+                    disabled={isMirror}
                   >
                     Auto
                   </button>
@@ -225,6 +255,7 @@ export default function ExpenseModal({
                       (form.stageMode === 'MANUAL' ? 'bg-sky-500 text-slate-950' : 'bg-zinc-900 text-zinc-200 hover:bg-zinc-800')
                     }
                     onClick={() => setForm((f) => ({ ...f, stageMode: 'MANUAL' }))}
+                    disabled={isMirror}
                   >
                     Manual
                   </button>
@@ -253,6 +284,7 @@ export default function ExpenseModal({
                         })
                         void prefillFxRate(o.currency, form.date)
                       }}
+                      disabled={isMirror}
                     >
                       <div className="text-base leading-none">{o.flag}</div>
                       <div className="max-w-full truncate leading-none">{o.label}</div>
@@ -280,6 +312,7 @@ export default function ExpenseModal({
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  disabled={isMirror}
                 />
               </Field>
 
@@ -292,6 +325,7 @@ export default function ExpenseModal({
                       setCurrency(e.target.value as ExpenseFormState['currency'])
                       void prefillFxRate(e.target.value as ExpenseFormState['currency'], form.date)
                     }}
+                    disabled={isMirror}
                   >
                     {currencyOptions.map((c) => (
                       <option key={c} value={c}>
@@ -309,6 +343,7 @@ export default function ExpenseModal({
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   value={form.categoryKind}
                   onChange={(e) => setForm((f) => ({ ...f, categoryKind: e.target.value as ExpenseFormState['categoryKind'], categoryId: '' }))}
+                  disabled={isMirror}
                 >
                   {kindOptions.map((k) => (
                     <option key={k} value={k} disabled={(restrictedKinds ?? []).includes(k) && !(isEditing && form.categoryKind === k)}>
@@ -330,7 +365,7 @@ export default function ExpenseModal({
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   value={form.categoryId}
                   onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                  disabled={categories.length === 0 || (subcategories.length === 0 && !primaryByKind.get(form.categoryKind))}
+                  disabled={isMirror || categories.length === 0 || (subcategories.length === 0 && !primaryByKind.get(form.categoryKind))}
                 >
                   {categories.length === 0 ? <option value="" disabled>Cargando…</option> : null}
                   {categories.length > 0 && subcategories.length === 0 ? (
@@ -382,6 +417,7 @@ export default function ExpenseModal({
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Ej: ramen, metro, boleto…"
+                  disabled={isMirror}
                 />
               </Field>
             </div>

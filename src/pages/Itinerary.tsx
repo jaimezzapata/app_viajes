@@ -1,5 +1,5 @@
 import Page from '@/components/Page'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import TripConfigModal from '@/components/TripConfigModal'
 import { Settings, ChevronDown, ChevronUp, Plane, Train, Bus, TramFront, Footprints, Map as MapIcon, LucideIcon } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -13,9 +13,12 @@ import ItineraryModal, { toFormState, toItineraryNotes, type ItineraryFormState 
 import { parseItineraryNotes } from '@/itinerary/notes'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import FlagAvatar from '@/components/FlagAvatar'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function Itinerary() {
   useDynamicHead('Itinerario', 'Map')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [openByStage, setOpenByStage] = useState<Record<string, boolean>>({})
@@ -59,6 +62,18 @@ export default function Itinerary() {
   )
 
   const expensesById = useMemo(() => new Map(expenses.map((e) => [e.id, e])), [expenses])
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('edit')
+    if (!id) return
+    if (!activeTripId) return
+    void db.itinerarios.get(id).then((it) => {
+      if (!it || it.deleted_at != null) return
+      if (it.trip_id !== activeTripId) return
+      handleEdit(it)
+      navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    })
+  }, [activeTripId, location.pathname, location.search, navigate])
 
   const stageOptions = useMemo(
     () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),

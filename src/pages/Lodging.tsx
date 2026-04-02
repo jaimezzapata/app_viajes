@@ -12,9 +12,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, ChevronUp, MapPin, CalendarDays, CheckCircle2 } from 'lucide-react'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import FlagAvatar from '@/components/FlagAvatar'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function Lodging() {
   useDynamicHead('Hospedaje', 'Hotel')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -56,6 +59,18 @@ export default function Lodging() {
   )
 
   const expensesById = useMemo(() => new Map(expenses.map((e) => [e.id, e])), [expenses])
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('edit')
+    if (!id) return
+    if (!activeTripId) return
+    void db.hospedajes.get(id).then((l) => {
+      if (!l || l.deleted_at != null) return
+      if (l.trip_id !== activeTripId) return
+      handleEdit(l)
+      navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    })
+  }, [activeTripId, location.pathname, location.search, navigate])
 
   const today = useMemo(() => toYmd(new Date()), [])
   const [form, setForm] = useState<LodgingFormState>(() => toLodgingFormState(today, countries))

@@ -14,14 +14,17 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import FlagAvatar from '@/components/FlagAvatar'
+import { useNavigate } from 'react-router-dom'
 
 type FormState = ExpenseFormState
 
 export default function Expenses() {
   useDynamicHead('Gastos', 'Receipt')
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [mirrorType, setMirrorType] = useState<'itinerario' | 'hospedaje' | 'actividad' | null>(null)
   const countries = useTripStore((s) => s.countries)
   const segments = useTripStore((s) => s.segments)
   const tripStartYmd = useTripStore((s) => s.tripStartYmd)
@@ -60,6 +63,36 @@ export default function Expenses() {
     },
     [activeTripId],
     [],
+  )
+
+  const { value: itineraryIdSet = new Set<string>() } = useLiveQuery<Set<string>>(
+    async () => {
+      if (!activeTripId) return new Set()
+      const rows = await db.itinerarios.where('trip_id').equals(activeTripId).toArray()
+      return new Set(rows.filter((r) => r.deleted_at == null).map((r) => r.id))
+    },
+    [activeTripId],
+    new Set(),
+  )
+
+  const { value: lodgingIdSet = new Set<string>() } = useLiveQuery<Set<string>>(
+    async () => {
+      if (!activeTripId) return new Set()
+      const rows = await db.hospedajes.where('trip_id').equals(activeTripId).toArray()
+      return new Set(rows.filter((r) => r.deleted_at == null).map((r) => r.id))
+    },
+    [activeTripId],
+    new Set(),
+  )
+
+  const { value: activityIdSet = new Set<string>() } = useLiveQuery<Set<string>>(
+    async () => {
+      if (!activeTripId) return new Set()
+      const rows = await db.actividades.where('trip_id').equals(activeTripId).toArray()
+      return new Set(rows.filter((r) => r.deleted_at == null).map((r) => r.id))
+    },
+    [activeTripId],
+    new Set(),
   )
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -155,6 +188,7 @@ export default function Expenses() {
 
   function handleNew() {
     setEditItemId(null)
+    setMirrorType(null)
     setForm({
       date: today,
       stage: 'COLOMBIA',
@@ -171,6 +205,8 @@ export default function Expenses() {
 
   function handleEdit(e: AppExpense) {
     const cat = byId.get(e.category_id)
+    const mirror = itineraryIdSet.has(e.id) ? 'itinerario' : lodgingIdSet.has(e.id) ? 'hospedaje' : activityIdSet.has(e.id) ? 'actividad' : null
+    setMirrorType(mirror)
     setEditItemId(e.id)
     setForm({
       date: e.date,
@@ -184,6 +220,14 @@ export default function Expenses() {
       fxRate: e.fx_rate_to_cop.toString().replace('.', ','),
     })
     setOpen(true)
+  }
+
+  function openMirrorSource() {
+    if (!editItemId || !mirrorType) return
+    if (mirrorType === 'itinerario') navigate(`/itinerario?edit=${encodeURIComponent(editItemId)}`)
+    if (mirrorType === 'hospedaje') navigate(`/hospedaje?edit=${encodeURIComponent(editItemId)}`)
+    if (mirrorType === 'actividad') navigate(`/actividades?edit=${encodeURIComponent(editItemId)}`)
+    setOpen(false)
   }
 
   async function onDelete() {
@@ -594,6 +638,8 @@ export default function Expenses() {
         isEditing={!!editItemId}
         onDelete={onDelete}
         restrictedKinds={['HOSPEDAJE', 'TRANSPORTE', 'ENTRETENIMIENTO']}
+        mirrorType={mirrorType}
+        onOpenMirrorSource={openMirrorSource}
       />
 
       <TripConfigModal open={tripOpen} onClose={() => setTripOpen(false)} />

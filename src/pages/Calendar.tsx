@@ -31,6 +31,7 @@ export default function Calendar() {
   const [view, setView] = useState<'MES' | 'AGENDA'>('MES')
   const todayYmd = useMemo(() => toYmd(new Date()), [])
   const todayInTrip = !!tripStartYmd && !!tripEndYmd && tripStartYmd <= todayYmd && todayYmd <= tripEndYmd
+  const [filterMode, setFilterMode] = useState<'TODO' | 'VUELOS' | 'HOTEL' | 'ACTIVIDADES' | 'GASTOS'>('TODO')
 
   const days = useMemo(() => {
     if (!tripStartYmd || !tripEndYmd) return []
@@ -323,6 +324,8 @@ export default function Calendar() {
               summary={s}
               open={s.ymd === selectedYmd}
               onToggle={() => setSelectedYmd(s.ymd === selectedYmd ? '' : s.ymd)}
+              filterMode={filterMode}
+              setFilterMode={setFilterMode}
             />
           ))}
         </div>
@@ -362,7 +365,7 @@ export default function Calendar() {
                       Cerrar
                     </button>
                   </div>
-                  <DayDetails summary={summariesByYmd.get(selectedYmd)!} />
+                  <DayDetails summary={summariesByYmd.get(selectedYmd)!} filterMode={filterMode} setFilterMode={setFilterMode} />
                 </>
               ) : (
                 <div className="text-sm text-zinc-400">No hay información para este día.</div>
@@ -379,10 +382,14 @@ function DayCard({
   summary,
   open,
   onToggle,
+  filterMode,
+  setFilterMode,
 }: {
   summary: DaySummary
   open: boolean
   onToggle: () => void
+  filterMode: 'TODO' | 'VUELOS' | 'HOTEL' | 'ACTIVIDADES' | 'GASTOS'
+  setFilterMode: (m: 'TODO' | 'VUELOS' | 'HOTEL' | 'ACTIVIDADES' | 'GASTOS') => void
 }) {
   const todayYmd = useMemo(() => toYmd(new Date()), [])
   const isToday = summary.ymd === todayYmd
@@ -417,7 +424,7 @@ function DayCard({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
           >
-            <DayDetails summary={summary} />
+            <DayDetails summary={summary} filterMode={filterMode} setFilterMode={setFilterMode} />
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -425,7 +432,15 @@ function DayCard({
   )
 }
 
-function DayDetails({ summary }: { summary: DaySummary }) {
+function DayDetails({
+  summary,
+  filterMode,
+  setFilterMode,
+}: {
+  summary: DaySummary
+  filterMode: 'TODO' | 'VUELOS' | 'HOTEL' | 'ACTIVIDADES' | 'GASTOS'
+  setFilterMode: (m: 'TODO' | 'VUELOS' | 'HOTEL' | 'ACTIVIDADES' | 'GASTOS') => void
+}) {
   const activityIconName = (t: string) => {
     const map: Record<string, string> = {
       MUSEO: 'Camera',
@@ -450,8 +465,62 @@ function DayDetails({ summary }: { summary: DaySummary }) {
     return map[t] ?? 'Map'
   }
 
+  const visibleActivities = filterMode === 'TODO' || filterMode === 'ACTIVIDADES'
+  const visibleRoutes = filterMode === 'TODO' || filterMode === 'VUELOS'
+  const visibleLodgings = filterMode === 'TODO' || filterMode === 'HOTEL'
+  const visibleExpenses = filterMode === 'TODO' || filterMode === 'GASTOS'
+
+  const filteredRoutes = useMemo(() => {
+    if (filterMode !== 'VUELOS') return summary.routes
+    return summary.routes.filter((r) => r.type === 'VUELO')
+  }, [filterMode, summary.routes])
+
+  const summaryItems = useMemo(() => summary.items.slice().sort((a, b) => b.cop - a.cop), [summary.items])
+
   return (
     <div className="mt-2 grid grid-cols-1 gap-3">
+      <div className="flex flex-wrap gap-2">
+        {([
+          ['TODO', 'Todo'],
+          ['VUELOS', 'Vuelos'],
+          ['HOTEL', 'Hotel'],
+          ['ACTIVIDADES', 'Actividades'],
+          ['GASTOS', 'Gastos'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setFilterMode(key)}
+            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+              filterMode === key ? 'border-sky-500/40 bg-sky-500/10 text-sky-300' : 'border-zinc-900 bg-zinc-950/40 text-zinc-300 hover:bg-zinc-900'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {visibleExpenses ? (
+        <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-300">Resumen de gastos</div>
+          {summaryItems.length === 0 ? (
+            <div className="text-xs text-zinc-400">Sin gastos registrados.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2">
+              {summaryItems.slice(0, 5).map((it) => (
+                <div key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-zinc-900 bg-zinc-950/50 px-3 py-2">
+                  <div className="min-w-0">
+                    <CategoryPill label={it.label} color={it.color} iconName={it.iconName} />
+                  </div>
+                  <div className="shrink-0 text-xs font-semibold text-zinc-200">{formatCop(it.cop)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {visibleActivities ? (
       <Section title="Actividades" empty="Sin actividades (MVP)">
         <div className="grid grid-cols-1 gap-2">
           {summary.activities.length === 0 ? <div className="text-xs text-zinc-400">Sin actividades programadas.</div> : null}
@@ -470,10 +539,12 @@ function DayDetails({ summary }: { summary: DaySummary }) {
           ))}
         </div>
       </Section>
+      ) : null}
+      {visibleRoutes ? (
       <Section title="Rutas" empty="Sin rutas registradas">
         <div className="grid grid-cols-1 gap-2">
-          {summary.routes.length === 0 ? <div className="text-xs text-zinc-400">Sin rutas para este día.</div> : null}
-          {summary.routes.map((rt) => (
+          {filteredRoutes.length === 0 ? <div className="text-xs text-zinc-400">Sin rutas para este día.</div> : null}
+          {filteredRoutes.map((rt) => (
             <div key={rt.id} className="flex items-start gap-3 rounded-xl border border-zinc-900 bg-zinc-950/60 p-3 shadow-sm">
               <div className="mt-0.5 shrink-0">
                 <CategoryPill label={rt.type} color="#0ea5e9" iconName={routeIconName(rt.type)} />
@@ -495,6 +566,8 @@ function DayDetails({ summary }: { summary: DaySummary }) {
           ))}
         </div>
       </Section>
+      ) : null}
+      {visibleLodgings ? (
       <Section title="Hotel" empty="Sin hospedaje">
         <div className="grid grid-cols-1 gap-2">
           {summary.lodgings.length === 0 ? <div className="text-xs text-zinc-400">La noche sin hotel asignado.</div> : null}
@@ -511,6 +584,8 @@ function DayDetails({ summary }: { summary: DaySummary }) {
           ))}
         </div>
       </Section>
+      ) : null}
+      {visibleExpenses ? (
       <Section title="Gastos" empty="Sin gastos">
         <div className="flex flex-wrap gap-2">
           {summary.items.length === 0 ? <div className="text-xs text-zinc-400">Sin gastos registrados.</div> : null}
@@ -522,6 +597,7 @@ function DayDetails({ summary }: { summary: DaySummary }) {
           ))}
         </div>
       </Section>
+      ) : null}
     </div>
   )
 }
