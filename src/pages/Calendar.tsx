@@ -269,7 +269,7 @@ export default function Calendar() {
                   </div>
 
                   {s && s.totalCop > 0 ? (
-                    <div className="mt-1 rounded-md border border-emerald-500/12 bg-emerald-500/10 px-1 py-0.5 text-[9px] font-bold tabular-nums text-emerald-300 text-center">
+                    <div className="mt-1 rounded-md border border-emerald-500/12 bg-emerald-500/10 px-1 py-0.5 text-[7px] font-bold tabular-nums text-emerald-300 text-center">
                       {formatShortCop(s.totalCop)}
                     </div>
                   ) : (
