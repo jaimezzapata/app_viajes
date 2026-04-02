@@ -1,7 +1,7 @@
 import Page from '@/components/Page'
 import { db } from '@/db/appDb'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import type { AppCategory, AppExpense, CountryStage } from '@/../shared/types'
+import type { AppCategory, AppExpense, AppLodging, CountryStage } from '@/../shared/types'
 import { useEffect, useMemo, useState } from 'react'
 import { nowIso, newId } from '@/utils/id'
 import { toYmd } from '@/utils/date'
@@ -194,7 +194,11 @@ export default function Expenses() {
       if (!existing) return
       
       const updated: AppExpense = { ...existing, deleted_at: ts, updated_at: ts }
-      await db.transaction('rw', db.gastos, db.outbox, async () => {
+      const maybeLodging = await db.hospedajes.get(editItemId)
+      const shouldCascadeLodging =
+        !!maybeLodging && maybeLodging.deleted_at == null && maybeLodging.trip_id === existing.trip_id
+
+      await db.transaction('rw', db.gastos, db.hospedajes, db.outbox, async () => {
         await db.gastos.put(updated)
         await db.outbox.add({
           id: newId(),
@@ -206,6 +210,21 @@ export default function Expenses() {
           try_count: 0,
           last_error: null,
         })
+
+        if (shouldCascadeLodging) {
+          const updatedL: AppLodging = { ...(maybeLodging as AppLodging), deleted_at: ts, updated_at: ts }
+          await db.hospedajes.put(updatedL)
+          await db.outbox.add({
+            id: newId(),
+            table_name: 'hospedajes',
+            op: 'UPSERT',
+            entity_id: updatedL.id,
+            payload: updatedL,
+            created_at: ts,
+            try_count: 0,
+            last_error: null,
+          })
+        }
       })
       setOpen(false)
     } catch (e) {
