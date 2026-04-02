@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { Globe, MapPin, PartyPopper, Flag, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,6 +8,7 @@ import { newId, nowIso } from '@/utils/id'
 import { toYmd, addDays } from '@/utils/date'
 import { db } from '@/db/appDb'
 import type { AppBudget } from '@/../shared/types'
+import FlagAvatar from '@/components/FlagAvatar'
 
 export default function TripConfigModal({ open, onClose, isNew }: { open: boolean; onClose: () => void; isNew?: boolean }) {
   const activeTripId = useTripStore((s) => s.activeTripId)
@@ -137,7 +139,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
 
   function cca2ToFlag(cca2: string) {
     const c = cca2.trim().toUpperCase()
-    if (!/^[A-Z]{2}$/.test(c)) return '🏳️'
+    if (!/^[A-Z]{2}$/.test(c)) return ''
     const a = 0x1f1e6
     const first = a + (c.charCodeAt(0) - 65)
     const second = a + (c.charCodeAt(1) - 65)
@@ -171,10 +173,25 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
     const reqId = ++reqIdRef.current
     const handle = window.setTimeout(async () => {
       try {
-        const url = `https://restcountries.com/v3.1/name/${encodeURIComponent(name)}?fields=cca2,currencies,name`
-        const resp = await fetch(url, { signal: ctrl.signal })
-        if (!resp.ok) return
-        const data = (await resp.json()) as Array<{ cca2?: string; currencies?: Record<string, unknown> }>
+        const fields = 'cca2,currencies,name'
+        const urlByName = `https://restcountries.com/v3.1/name/${encodeURIComponent(name)}?fields=${fields}`
+        const urlByTranslation = `https://restcountries.com/v3.1/translation/${encodeURIComponent(name)}?fields=${fields}`
+
+        let data: Array<{ cca2?: string; currencies?: Record<string, unknown> }> = []
+
+        const resp1 = await fetch(urlByName, { signal: ctrl.signal })
+        if (resp1.ok) {
+          data = (await resp1.json()) as Array<{ cca2?: string; currencies?: Record<string, unknown> }>
+        }
+
+        if (!data?.length) {
+          const resp2 = await fetch(urlByTranslation, { signal: ctrl.signal })
+          if (resp2.ok) {
+            data = (await resp2.json()) as Array<{ cca2?: string; currencies?: Record<string, unknown> }>
+          }
+        }
+
+        if (!data?.length) return
         const first = data?.[0]
         const cca2 = String(first?.cca2 ?? '').toUpperCase()
         const currency = first?.currencies && !localIsNational ? Object.keys(first.currencies)[0] : 'COP'
@@ -219,7 +236,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
     const name = newCountryName.trim()
     const acronym = newCountryAcronym.trim().toUpperCase() || name.slice(0, 2).toUpperCase()
     const currency = localIsNational ? 'COP' : newCountryCurrency.trim().toUpperCase()
-    const flag = localIsNational ? '📍' : (newCountryFlag.trim() || '🏳️')
+    const flag = localIsNational ? '' : newCountryFlag.trim()
     if (!name) return
     if (!currency) return
 
@@ -510,20 +527,20 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                 <button
                   type="button"
                   onClick={() => setLocalIsNational(false)}
-                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
                     !localIsNational ? 'bg-zinc-800 text-sky-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
-                  🌍 Internacional
+                  <Globe className="w-4 h-4" /> Internacional
                 </button>
                 <button
                   type="button"
                   onClick={() => setLocalIsNational(true)}
-                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition-all ${
                     localIsNational ? 'bg-emerald-900/40 text-emerald-400 shadow-md border border-emerald-500/20' : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
-                  📍 Nacional (COP)
+                  <MapPin className="w-4 h-4" /> Nacional (COP)
                 </button>
               </div>
             </div>
@@ -554,7 +571,13 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
               <div className="flex flex-wrap gap-2">
                 {localCountries.map((c) => (
                   <div key={c.code} className={`flex items-center gap-2 rounded-2xl border px-3 py-2 transition-colors ${editingCountryCode === c.code ? 'border-sky-500/50 bg-sky-500/10' : 'border-zinc-900 bg-zinc-950/40'}`}>
-                    <div className="text-base leading-none">{c.flag}</div>
+                    {localIsNational ? (
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-zinc-800/70 bg-zinc-950/40 p-0.5">
+                        <MapPin className="h-3.5 w-3.5 text-zinc-400" />
+                      </div>
+                    ) : (
+                      <FlagAvatar cca2={c.acronym} className="h-6 w-8" />
+                    )}
                     <div>
                       <div className="text-xs font-semibold text-zinc-100">{c.name}</div>
                       <div className="text-[11px] text-zinc-400">{c.acronym} · {c.currency}</div>
@@ -679,9 +702,22 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                            <span className="truncate">{countryShort(localCountries, seg.fromStage)}</span>
-                            <span className="text-zinc-600">→</span>
-                            <span className="truncate">{countryShort(localCountries, seg.toStage)}</span>
+                            {localIsNational ? (
+                              <>
+                                <span className="truncate">{countryShort(localCountries, seg.fromStage)}</span>
+                                <span className="text-zinc-600">→</span>
+                                <span className="truncate">{countryShort(localCountries, seg.toStage)}</span>
+                              </>
+                            ) : (
+                              <>
+                                <FlagAvatar cca2={countryShort(localCountries, seg.fromStage)} className="h-5 w-7" />
+                                <span className="text-zinc-600">→</span>
+                                <FlagAvatar cca2={countryShort(localCountries, seg.toStage)} className="h-5 w-7" />
+                                <span className="truncate">{countryName(localCountries, seg.fromStage)}</span>
+                                <span className="text-zinc-600">→</span>
+                                <span className="truncate">{countryName(localCountries, seg.toStage)}</span>
+                              </>
+                            )}
                           </div>
                           <div className="mt-0.5 text-[11px] text-zinc-500">
                             {seg.startYmd.substring(5)} al {seg.endYmd.substring(5)}
@@ -694,7 +730,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                           type="button" 
                           onClick={(e) => { e.stopPropagation(); removeSeg(seg.id) }}
                         >
-                          ✕
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -777,7 +813,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
             ) : (
               <div className="flex flex-col h-full justify-center text-center py-6">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 mb-4">
-                  <span className="text-3xl">🎉</span>
+                  <PartyPopper className="h-8 w-8 text-emerald-400" />
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">¡Viaje creado con éxito!</h3>
                 <p className="text-sm text-zinc-400 mb-6 px-4">
@@ -929,4 +965,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function countryShort(countries: TripCountry[], code: string) {
   return countries.find((c) => c.code === code)?.acronym ?? code
+}
+
+function countryName(countries: TripCountry[], code: string) {
+  return countries.find((c) => c.code === code)?.name ?? code
 }

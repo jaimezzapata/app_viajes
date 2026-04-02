@@ -24,7 +24,8 @@ export default function AuthScreen() {
       } else {
         const { error } = await supabase.auth.signUp({ email: fakeEmail, password: pin })
         if (error) throw error
-        alert('Cuenta creada exitosamente. 🎉')
+        alert('Cuenta creada exitosamente. ¡Ya puedes iniciar sesión!')
+        setIsLogin(true)
       }
     } catch (err: any) {
       setError(err.message || 'Error de autenticación')

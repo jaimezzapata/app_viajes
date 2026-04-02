@@ -12,8 +12,11 @@ import ActivityModal from '@/components/ActivityModal'
 import CategoryPill from '@/components/CategoryPill'
 import { useOnline } from '@/hooks/useOnline'
 import { WifiOff } from 'lucide-react'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
+import FlagAvatar from '@/components/FlagAvatar'
 
 export default function Activities() {
+  useDynamicHead('Actividades', 'Ticket')
   const activeTripId = useTripStore((s) => s.activeTripId)
   const countries = useTripStore((s) => s.countries)
   const online = useOnline()
@@ -32,7 +35,7 @@ export default function Activities() {
   )
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),
     [countries],
   )
 
@@ -107,19 +110,19 @@ export default function Activities() {
 
           const meta = stageOptions.find((s) => s.stage === stageKey)
           const label = meta?.label ?? stageKey
-          const flag = meta?.flag ?? '🏳️'
+          const cca2 = meta?.acronym
           const isOpen = openByStage[stageKey] ?? true
 
-          return (
-            <div key={stageKey} className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950/40 shadow-sm shadow-black/20">
-              <button
-                className="flex w-full items-center justify-between gap-3 px-4 py-3"
-                type="button"
-                onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="text-base leading-none">{flag}</div>
-                  <div className="text-left">
+            return (
+              <div key={stageKey} className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950/40 shadow-sm shadow-black/20">
+                <button
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3"
+                  type="button"
+                  onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
+                >
+                  <div className="flex items-center gap-2">
+                    <FlagAvatar cca2={cca2} />
+                    <div className="text-left">
                     <div className="text-sm font-semibold text-zinc-100">{label}</div>
                     <div className="text-[11px] text-zinc-400">{items.length} actividades</div>
                   </div>

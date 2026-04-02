@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { TriangleAlert } from 'lucide-react'
 
 export default function GlobalErrorModal() {
   const [errors, setErrors] = useState<{ id: string; message: string; details: string; time: string }[]>([])
@@ -81,7 +82,7 @@ export default function GlobalErrorModal() {
           >
             <div className="mb-3 flex items-center justify-between shrink-0">
               <div className="text-xl font-bold text-rose-500 flex items-center gap-2">
-                <span>⚠️</span>
+                <TriangleAlert className="h-6 w-6" />
                 <span>Error en la App {errors.length > 1 ? `(${errors.length})` : ''}</span>
               </div>
               {errors.length > 1 && (

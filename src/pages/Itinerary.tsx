@@ -1,7 +1,7 @@
 import Page from '@/components/Page'
 import { useMemo, useState } from 'react'
 import TripConfigModal from '@/components/TripConfigModal'
-import { Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { Settings, ChevronDown, ChevronUp, Plane, Train, Bus, TramFront, Footprints, Map as MapIcon, LucideIcon } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
@@ -11,8 +11,11 @@ import { toYmd } from '@/utils/date'
 import { nowIso, newId } from '@/utils/id'
 import ItineraryModal, { toFormState, toItineraryNotes, type ItineraryFormState } from '@/components/ItineraryModal'
 import { parseItineraryNotes } from '@/itinerary/notes'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
+import FlagAvatar from '@/components/FlagAvatar'
 
 export default function Itinerary() {
+  useDynamicHead('Itinerario', 'Map')
   const [open, setOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [openByStage, setOpenByStage] = useState<Record<string, boolean>>({})
@@ -57,7 +60,7 @@ export default function Itinerary() {
   const expensesById = useMemo(() => new Map(expenses.map((e) => [e.id, e])), [expenses])
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),
     [countries],
   )
 
@@ -345,7 +348,7 @@ export default function Itinerary() {
 
           const meta = stageOptions.find((s) => s.stage === stageKey)
           const label = meta?.label ?? stageKey
-          const flag = meta?.flag ?? '🏳️'
+          const cca2 = meta?.acronym
           const isOpen = openByStage[stageKey] ?? true
 
           return (
@@ -356,7 +359,7 @@ export default function Itinerary() {
                 onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
               >
                 <div className="flex items-center gap-2">
-                  <div className="text-base leading-none">{flag}</div>
+                  <FlagAvatar cca2={cca2} />
                   <div className="text-left">
                     <div className="text-sm font-semibold text-zinc-100">{label}</div>
                     <div className="text-[11px] text-zinc-400">{catItems.length} trayectos/rutas</div>
@@ -379,6 +382,16 @@ export default function Itinerary() {
                       const isFlight = it.type === 'VUELO'
                       const stops = (notes.stops ?? []).filter(Boolean)
                       const airlines = (notes.airlines ?? []).filter(Boolean)
+
+                      const TypeIcon: LucideIcon = {
+                        VUELO: Plane,
+                        TREN: Train,
+                        BUS: Bus,
+                        METRO: TramFront,
+                        A_PIE: Footprints,
+                        OTRO: MapIcon,
+                      }[it.type] || MapIcon
+
                       return (
                         <button
                           key={it.id}
@@ -415,7 +428,10 @@ export default function Itinerary() {
                               {notes.note ? <div className="mt-2 text-xs text-zinc-400">{notes.note}</div> : null}
                             </div>
 
-                            <div className="text-[11px] text-zinc-400 shrink-0">{it.type}</div>
+                            <div className="flex flex-col items-center gap-1 text-[11px] text-zinc-400 shrink-0">
+                              <TypeIcon className="h-5 w-5" />
+                              <span>{it.type}</span>
+                            </div>
                           </div>
                         </button>
                       )

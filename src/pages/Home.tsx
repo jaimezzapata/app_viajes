@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
 import { useTripStore } from '@/stores/tripStore'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
 
 export default function Home() {
+  useDynamicHead('Inicio', 'Home')
   const navigate = useNavigate()
   const setActiveTripId = useTripStore((s) => s.setActiveTripId)
   const { value: trips = [] } = useLiveQuery(

@@ -6,6 +6,8 @@ import type { ExpenseFormState } from '@/types/expenses'
 import { CATEGORY_KIND_LABEL } from '@/utils/categoryPalette'
 import { stageForYmd, useTripStore } from '@/stores/tripStore'
 import { formatFxRate, getRateToCop } from '@/fx/fx'
+import AnimatedIcon from '@/components/AnimatedIcon'
+import { Globe } from 'lucide-react'
 
 export default function ExpenseModal({
   open,
@@ -250,15 +252,13 @@ export default function ExpenseModal({
               </div>
 
               <div className="mt-2 rounded-2xl border border-zinc-900 bg-zinc-950/40 px-3 py-2">
-                <div className="text-[11px] text-zinc-400">
-                  {(countries.find((c) => c.code === derivedSegment?.fromStage)?.flag ?? '🏳️') +
-                    ' ' +
-                    (countries.find((c) => c.code === derivedSegment?.fromStage)?.name ?? (derivedSegment?.fromStage ?? '—'))}
-                  {' → '}
-                  {(countries.find((c) => c.code === derivedSegment?.toStage)?.flag ?? '🏳️') +
-                    ' ' +
-                    (countries.find((c) => c.code === derivedSegment?.toStage)?.name ?? (derivedSegment?.toStage ?? derivedStage))}
-                  {form.stageMode === 'AUTO' ? ' · automático por fecha' : ' · tramo de referencia'}
+                <div className="flex flex-wrap items-center gap-1 text-[11px] text-zinc-400">
+                  {countries.find((c) => c.code === derivedSegment?.fromStage)?.flag || <Globe className="w-3 h-3 text-zinc-400" />}
+                  <span>{countries.find((c) => c.code === derivedSegment?.fromStage)?.name ?? (derivedSegment?.fromStage ?? '—')}</span>
+                  <span className="text-zinc-600">→</span>
+                  {countries.find((c) => c.code === derivedSegment?.toStage)?.flag || <Globe className="w-3 h-3 text-zinc-400" />}
+                  <span>{countries.find((c) => c.code === derivedSegment?.toStage)?.name ?? (derivedSegment?.toStage ?? derivedStage)}</span>
+                  <span>{form.stageMode === 'AUTO' ? ' · automático por fecha' : ' · tramo de referencia'}</span>
                 </div>
               </div>
             </div>
@@ -308,7 +308,14 @@ export default function ExpenseModal({
                 </select>
               </Field>
 
-              <Field label="Subcategoría">
+              <Field label={
+                <div className="flex items-center gap-1.5">
+                  <span>Subcategoría</span>
+                  {form.categoryId && categories.find(c => c.id === form.categoryId)?.icon ? (
+                    <AnimatedIcon name={categories.find(c => c.id === form.categoryId)!.icon!} className="w-3.5 h-3.5" color={categories.find(c => c.id === form.categoryId)?.color} />
+                  ) : null}
+                </div>
+              }>
                 <select
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   value={form.categoryId}
@@ -424,7 +431,7 @@ export default function ExpenseModal({
   )
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <label className="block">
       <div className="mb-1 text-xs font-medium text-zinc-300">{label}</div>

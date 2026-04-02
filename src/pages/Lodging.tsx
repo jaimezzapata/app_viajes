@@ -10,8 +10,11 @@ import { useTripStore } from '@/stores/tripStore'
 import TripConfigModal from '@/components/TripConfigModal'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, ChevronUp, MapPin, CalendarDays, CheckCircle2 } from 'lucide-react'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
+import FlagAvatar from '@/components/FlagAvatar'
 
 export default function Lodging() {
+  useDynamicHead('Hospedaje', 'Hotel')
   const [open, setOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -58,7 +61,7 @@ export default function Lodging() {
   const [form, setForm] = useState<LodgingFormState>(() => toLodgingFormState(today, countries))
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),
     [countries],
   )
 
@@ -350,20 +353,20 @@ export default function Lodging() {
             if (items.length === 0) return null
 
             const meta = stageOptions.find((s) => s.stage === stageKey)
-            const label = meta?.label ?? stageKey
-            const flag = meta?.flag ?? '🏳️'
-            const isOpen = openByStage[stageKey] ?? true
+          const label = meta?.label ?? stageKey
+          const cca2 = meta?.acronym
+          const isOpen = openByStage[stageKey] ?? true
 
-            return (
-              <div key={stageKey} className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950/40 shadow-sm shadow-black/20">
-                <button
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3"
-                  type="button"
-                  onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="text-base leading-none">{flag}</div>
-                    <div className="text-left">
+          return (
+            <div key={stageKey} className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950/40 shadow-sm shadow-black/20">
+              <button
+                className="flex w-full items-center justify-between gap-3 px-4 py-3"
+                type="button"
+                onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
+              >
+                <div className="flex items-center gap-2">
+                  <FlagAvatar cca2={cca2} />
+                  <div className="text-left">
                       <div className="text-sm font-semibold text-zinc-100">{label}</div>
                       <div className="text-[11px] text-zinc-400">{items.length} reserva{items.length === 1 ? '' : 's'}</div>
                     </div>

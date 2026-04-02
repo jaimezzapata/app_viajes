@@ -12,10 +12,13 @@ import { stageForYmd, useTripStore } from '@/stores/tripStore'
 import TripConfigModal from '@/components/TripConfigModal'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
+import FlagAvatar from '@/components/FlagAvatar'
 
 type FormState = ExpenseFormState
 
 export default function Expenses() {
+  useDynamicHead('Gastos', 'Receipt')
   const [open, setOpen] = useState(false)
   const [editItemId, setEditItemId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -62,7 +65,7 @@ export default function Expenses() {
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, acronym: c.acronym })),
     [countries],
   )
 
@@ -369,7 +372,7 @@ export default function Expenses() {
 
             const meta = stageOptions.find((s) => s.stage === stageKey)
             const label = meta?.label ?? stageKey
-            const flag = meta?.flag ?? '🏳️'
+            const cca2 = meta?.acronym
             const total = items.reduce((acc, e) => acc + e.amount_cop, 0)
             const isOpen = openByStage[stageKey] ?? true
 
@@ -381,7 +384,7 @@ export default function Expenses() {
                   onClick={() => setOpenByStage((s) => ({ ...s, [stageKey]: !(s[stageKey] ?? true) }))}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="text-base leading-none">{flag}</div>
+                    <FlagAvatar cca2={cca2} />
                     <div className="text-left">
                       <div className="text-sm font-semibold text-zinc-100">{label}</div>
                       <div className="text-[11px] text-zinc-400">{items.length} movimientos · {formatCop(total)}</div>
@@ -409,11 +412,11 @@ export default function Expenses() {
                             onClick={() => handleEdit(e)}
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {cat ? <CategoryPill label={cat.name} color={cat.color} /> : null}
-                                  <div className="text-xs text-zinc-400">{e.date}</div>
-                                </div>
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {cat ? <CategoryPill label={cat.name} color={cat.color} iconName={cat.icon} /> : null}
+                                    <div className="text-xs text-zinc-400">{e.date}</div>
+                                  </div>
                                 <div className="mt-2 text-sm text-zinc-100">{e.description || 'Sin descripción'}</div>
                                 <div className="mt-1 text-xs text-zinc-400">
                                   {formatMoney(e.amount_original, e.currency)} · tasa {e.fx_rate_to_cop} · {formatCop(e.amount_cop)}

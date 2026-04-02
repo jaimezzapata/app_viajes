@@ -11,8 +11,12 @@ import { useTripStore } from '@/stores/tripStore'
 import { Download, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { exportConsolidatedExcel, exportExecutivePdf } from '@/utils/export'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useDynamicHead } from '@/hooks/useDynamicHead'
+import { normalizeCountryFlag } from '@/utils/flags'
+import FlagAvatar from '@/components/FlagAvatar'
 
 export default function Reports() {
+  useDynamicHead('Reportes', 'BarChart3')
   const online = useOnline()
   const countries = useTripStore((s) => s.countries)
   const activeTripId = useTripStore((s) => s.activeTripId)
@@ -123,7 +127,7 @@ export default function Reports() {
   }
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => countries.map((c) => ({ stage: c.code, label: c.name, cca2: c.acronym, flag: normalizeCountryFlag(c.flag, c.acronym) })),
     [countries],
   )
 
@@ -218,7 +222,7 @@ export default function Reports() {
               <MiniDonutCard
                 key={o.stage}
                 title={o.label}
-                icon={o.flag}
+                cca2={o.cca2}
                 value={spentByStage.get(o.stage) ?? 0}
                 total={spentTotal}
                 color={stageColor(o.stage)}
@@ -235,7 +239,6 @@ export default function Reports() {
               <MiniDonutCard
                 key={k}
                 title={CATEGORY_KIND_LABEL[k]}
-                icon=""
                 value={spentByKind[k]}
                 total={spentTotal}
                 color={CATEGORY_KIND_COLOR[k]}
@@ -359,14 +362,14 @@ function BudgetHero({
 
 function MiniDonutCard({
   title,
-  icon,
+  cca2,
   value,
   total,
   color,
   variant,
 }: {
   title: string
-  icon: string
+  cca2?: string
   value: number
   total: number
   color: string
@@ -379,7 +382,7 @@ function MiniDonutCard({
       <div className="min-w-0">
         {variant === 'stage' ? (
           <div className="flex items-center gap-2">
-            <div className="text-base leading-none shrink-0">{icon}</div>
+            <FlagAvatar cca2={cca2} />
             <div className="text-xs font-semibold text-zinc-100 truncate">{title}</div>
           </div>
         ) : (
@@ -451,7 +454,7 @@ function Donut({
                 r={r}
                 stroke={s.color}
                 strokeWidth={thickness}
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 fill="none"
                 strokeDasharray={dashArray}
                 strokeDashoffset={dashOffset}

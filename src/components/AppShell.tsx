@@ -8,7 +8,7 @@ import { syncNow } from '@/sync/sync'
 import { supabase } from '@/supabase/client'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
-import { LogOut, Trash2, RefreshCw, Home as HomeIcon } from 'lucide-react'
+import { LogOut, Trash2, RefreshCw, Home as HomeIcon, Check } from 'lucide-react'
 import { useTripStore } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { addDays, toYmd } from '@/utils/date'
@@ -113,7 +113,7 @@ export default function AppShell({ children }: PropsWithChildren) {
                 {outboxCount > 0 ? (
                   <span className="text-amber-400">{outboxCount} pend.</span>
                 ) : (
-                  <span>Sync ✓</span>
+                  <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Sync</span>
                 )}
               </div>
             </div>
