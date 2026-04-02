@@ -24,6 +24,7 @@ export default function Itinerary() {
 
   const activeTripId = useTripStore((s) => s.activeTripId)
   const countries = useTripStore((s) => s.countries)
+  const isNational = useTripStore((s) => s.isNational)
 
   const { value: items = [] } = useLiveQuery<AppItinerary[]>(
     async () => {
@@ -206,8 +207,20 @@ export default function Itinerary() {
     try {
       let expenseCatId: string | null = null
       if (wantsExpense) {
-        const cat = categories.find((c) => c.kind === 'TRANSPORTE' && c.deleted_at == null)
-        if (!cat) throw new Error('No se encontró la categoría TRANSPORTE para crear el gasto automático.')
+        const subkindByType: Record<string, string> = {
+          VUELO: isNational ? 'VUELOS_INTERNOS' : 'VUELOS_INTERNACIONALES',
+          TREN: 'TRANSPORTE_INTERURBANO',
+          BUS: 'TRANSPORTE_URBANO',
+          METRO: 'TRANSPORTE_URBANO',
+          A_PIE: 'TRANSPORTE_URBANO',
+        }
+
+        const desiredSubkind = subkindByType[form.type] ?? 'TRANSPORTE_URBANO'
+        const cat =
+          categories.find((c) => c.kind === 'TRANSPORTE' && c.subkind === desiredSubkind && c.deleted_at == null) ??
+          categories.find((c) => c.kind === 'TRANSPORTE' && c.deleted_at == null)
+
+        if (!cat) throw new Error('No se encontró una categoría de TRANSPORTE para crear el gasto automático.')
         expenseCatId = cat.id
       }
 

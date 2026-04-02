@@ -231,16 +231,34 @@ export default function ActivityModal({
     if (!existingItem) return
     const ts = nowIso()
     const item: AppActivity = { ...existingItem, deleted_at: ts, updated_at: ts }
-    await db.actividades.put(item)
-    await db.outbox.add({
-      id: newId(),
-      table_name: 'actividades',
-      op: 'UPSERT',
-      entity_id: existingItem.id,
-      payload: item,
-      created_at: ts,
-      try_count: 0,
-      last_error: null,
+    await db.transaction('rw', [db.actividades, db.gastos, db.outbox], async () => {
+      await db.actividades.put(item)
+      await db.outbox.add({
+        id: newId(),
+        table_name: 'actividades',
+        op: 'UPSERT',
+        entity_id: existingItem.id,
+        payload: item,
+        created_at: ts,
+        try_count: 0,
+        last_error: null,
+      })
+
+      const existingExp = await db.gastos.get(existingItem.id)
+      if (existingExp && existingExp.deleted_at == null) {
+        const updatedE: AppExpense = { ...existingExp, deleted_at: ts, updated_at: ts }
+        await db.gastos.put(updatedE)
+        await db.outbox.add({
+          id: newId(),
+          table_name: 'gastos',
+          op: 'UPSERT',
+          entity_id: updatedE.id,
+          payload: updatedE,
+          created_at: ts,
+          try_count: 0,
+          last_error: null,
+        })
+      }
     })
     onClose()
   }

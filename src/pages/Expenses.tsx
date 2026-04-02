@@ -1,10 +1,10 @@
 import Page from '@/components/Page'
 import { db } from '@/db/appDb'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import type { AppCategory, AppExpense, AppLodging, CountryStage } from '@/../shared/types'
+import type { AppActivity, AppCategory, AppExpense, AppItinerary, AppLodging, CountryStage } from '@/../shared/types'
 import { useEffect, useMemo, useState } from 'react'
 import { nowIso, newId } from '@/utils/id'
-import { toYmd } from '@/utils/date'
+import { addDays, parseYmd, toYmd } from '@/utils/date'
 import CategoryPill from '@/components/CategoryPill'
 import ExpenseModal from '@/components/ExpenseModal'
 import type { ExpenseFormState } from '@/types/expenses'
@@ -159,7 +159,7 @@ export default function Expenses() {
       date: today,
       stage: 'COLOMBIA',
       stageMode: 'AUTO',
-      categoryKind: 'HOSPEDAJE',
+      categoryKind: 'COMIDA',
       categoryId: '',
       description: '',
       currency: 'COP',
@@ -176,7 +176,7 @@ export default function Expenses() {
       date: e.date,
       stage: e.stage,
       stageMode: 'MANUAL',
-      categoryKind: cat?.kind ?? 'HOSPEDAJE',
+      categoryKind: cat?.kind ?? 'COMIDA',
       categoryId: e.category_id,
       description: e.description,
       currency: e.currency,
@@ -197,8 +197,14 @@ export default function Expenses() {
       const maybeLodging = await db.hospedajes.get(editItemId)
       const shouldCascadeLodging =
         !!maybeLodging && maybeLodging.deleted_at == null && maybeLodging.trip_id === existing.trip_id
+      const maybeItinerary = await db.itinerarios.get(editItemId)
+      const shouldCascadeItinerary =
+        !!maybeItinerary && maybeItinerary.deleted_at == null && maybeItinerary.trip_id === existing.trip_id
+      const maybeActivity = await db.actividades.get(editItemId)
+      const shouldCascadeActivity =
+        !!maybeActivity && maybeActivity.deleted_at == null && maybeActivity.trip_id === existing.trip_id
 
-      await db.transaction('rw', db.gastos, db.hospedajes, db.outbox, async () => {
+      await db.transaction('rw', [db.gastos, db.hospedajes, db.itinerarios, db.actividades, db.outbox], async () => {
         await db.gastos.put(updated)
         await db.outbox.add({
           id: newId(),
@@ -220,6 +226,36 @@ export default function Expenses() {
             op: 'UPSERT',
             entity_id: updatedL.id,
             payload: updatedL,
+            created_at: ts,
+            try_count: 0,
+            last_error: null,
+          })
+        }
+
+        if (shouldCascadeItinerary) {
+          const updatedI: AppItinerary = { ...(maybeItinerary as AppItinerary), deleted_at: ts, updated_at: ts }
+          await db.itinerarios.put(updatedI)
+          await db.outbox.add({
+            id: newId(),
+            table_name: 'itinerarios',
+            op: 'UPSERT',
+            entity_id: updatedI.id,
+            payload: updatedI,
+            created_at: ts,
+            try_count: 0,
+            last_error: null,
+          })
+        }
+
+        if (shouldCascadeActivity) {
+          const updatedA: AppActivity = { ...(maybeActivity as AppActivity), deleted_at: ts, updated_at: ts }
+          await db.actividades.put(updatedA)
+          await db.outbox.add({
+            id: newId(),
+            table_name: 'actividades',
+            op: 'UPSERT',
+            entity_id: updatedA.id,
+            payload: updatedA,
             created_at: ts,
             try_count: 0,
             last_error: null,
@@ -291,7 +327,23 @@ export default function Expenses() {
           updated_at: ts,
         }
 
-        await db.transaction('rw', db.gastos, db.outbox, async () => {
+        const maybeLodging = await db.hospedajes.get(editItemId)
+        const shouldCascadeLodging =
+          !!maybeLodging && maybeLodging.deleted_at == null && maybeLodging.trip_id === existing.trip_id
+        const maybeItinerary = await db.itinerarios.get(editItemId)
+        const shouldCascadeItinerary =
+          !!maybeItinerary && maybeItinerary.deleted_at == null && maybeItinerary.trip_id === existing.trip_id
+        const maybeActivity = await db.actividades.get(editItemId)
+        const shouldCascadeActivity =
+          !!maybeActivity && maybeActivity.deleted_at == null && maybeActivity.trip_id === existing.trip_id
+
+        const diffDays = (a: string, b: string) => {
+          const da = parseYmd(a).getTime()
+          const dbb = parseYmd(b).getTime()
+          return Math.round((da - dbb) / 86400000)
+        }
+
+        await db.transaction('rw', [db.gastos, db.hospedajes, db.itinerarios, db.actividades, db.outbox], async () => {
           await db.gastos.put(updated)
           await db.outbox.add({
             id: newId(),
@@ -303,6 +355,73 @@ export default function Expenses() {
             try_count: 0,
             last_error: null,
           })
+
+          if (shouldCascadeItinerary) {
+            const i = maybeItinerary as AppItinerary
+            const nextI: AppItinerary = { ...i, date: updated.date, stage: updated.stage, updated_at: ts }
+            await db.itinerarios.put(nextI)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'itinerarios',
+              op: 'UPSERT',
+              entity_id: nextI.id,
+              payload: nextI,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
+
+          if (shouldCascadeActivity) {
+            const a = maybeActivity as AppActivity
+            const nextTitle = updated.description.trim()
+            const nextA: AppActivity = {
+              ...a,
+              date: updated.date,
+              stage: updated.stage,
+              title: nextTitle ? nextTitle : a.title,
+              updated_at: ts,
+            }
+            await db.actividades.put(nextA)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'actividades',
+              op: 'UPSERT',
+              entity_id: nextA.id,
+              payload: nextA,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
+
+          if (shouldCascadeLodging) {
+            const l = maybeLodging as AppLodging
+            let checkIn = l.check_in
+            let checkOut = l.check_out
+
+            if (updated.date && l.check_in && l.check_out && updated.date !== l.check_in) {
+              const delta = diffDays(updated.date, l.check_in)
+              checkIn = updated.date
+              checkOut = toYmd(addDays(parseYmd(l.check_out), delta))
+              if (checkOut <= checkIn) {
+                checkOut = toYmd(addDays(parseYmd(checkIn), 1))
+              }
+            }
+
+            const nextL: AppLodging = { ...l, stage: updated.stage, check_in: checkIn, check_out: checkOut, updated_at: ts }
+            await db.hospedajes.put(nextL)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'hospedajes',
+              op: 'UPSERT',
+              entity_id: nextL.id,
+              payload: nextL,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
         })
       } else {
         const item: AppExpense = {
@@ -474,6 +593,7 @@ export default function Expenses() {
         errorMessage={saveError ?? (categoriesError instanceof Error ? categoriesError.message : categoriesError ? 'Error cargando categorías.' : null)}
         isEditing={!!editItemId}
         onDelete={onDelete}
+        restrictedKinds={['HOSPEDAJE', 'TRANSPORTE', 'ENTRETENIMIENTO']}
       />
 
       <TripConfigModal open={tripOpen} onClose={() => setTripOpen(false)} />

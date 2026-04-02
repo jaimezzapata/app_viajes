@@ -46,6 +46,45 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
 
   const initOpenRef = useRef(false)
 
+  function sanitizeCountriesAndSegments(inputCountries: TripCountry[], inputSegments: TripSegment[]) {
+    const used = new Set<string>()
+    const codeMap = new Map<string, string>()
+
+    const nextCountries = inputCountries.map((c, idx) => {
+      const rawCode = String((c as any)?.code ?? '').trim()
+      let code = rawCode
+      if (!code) {
+        const base = String((c as any)?.name ?? (c as any)?.acronym ?? `Pais ${idx + 1}`)
+        code = normalizeCountryCode(base)
+      }
+
+      const base = code
+      let i = 2
+      while (used.has(code)) {
+        code = `${base}_${i}`
+        i++
+      }
+      used.add(code)
+      if (rawCode !== code) codeMap.set(rawCode, code)
+
+      const name = String((c as any)?.name ?? code)
+      const acronymRaw = String((c as any)?.acronym ?? '').trim().toUpperCase()
+      const acronym = acronymRaw || name.trim().slice(0, 2).toUpperCase()
+      const currency = (String((c as any)?.currency ?? '').trim().toUpperCase() || (localIsNational ? 'COP' : ''))
+      const flag = String((c as any)?.flag ?? '')
+
+      return { code, acronym, name, flag, currency } as TripCountry
+    })
+
+    const nextSegments = inputSegments.map((s) => ({
+      ...s,
+      fromStage: (codeMap.get(String(s.fromStage)) ?? s.fromStage) as TripStage,
+      toStage: (codeMap.get(String(s.toStage)) ?? s.toStage) as TripStage,
+    }))
+
+    return { nextCountries, nextSegments }
+  }
+
   useEffect(() => {
     if (!open) {
       initOpenRef.current = false
@@ -71,8 +110,9 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
       setLocalStartYmd(globalStartYmd)
       setLocalEndYmd(globalEndYmd)
       setLocalIsNational(isNational)
-      setLocalSegments(segments)
-      setLocalCountries(countries)
+      const { nextCountries, nextSegments } = sanitizeCountriesAndSegments(countries, segments)
+      setLocalSegments(nextSegments)
+      setLocalCountries(nextCountries)
       if (activeTripId) {
         db.viajes.get(activeTripId).then((t) => {
           if (t) {
@@ -85,7 +125,7 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   }, [open, isNew, activeTripId, countries, segments, globalStartYmd, globalEndYmd, isNational])
 
   const stageOptions = useMemo(
-    () => localCountries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag })),
+    () => localCountries.map((c) => ({ stage: String(c.code ?? ''), label: c.name, flag: c.flag })),
     [localCountries],
   )
 

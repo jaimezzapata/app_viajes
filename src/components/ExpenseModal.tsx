@@ -22,6 +22,7 @@ export default function ExpenseModal({
   errorMessage,
   isEditing,
   onDelete,
+  restrictedKinds,
 }: {
   open: boolean
   onClose: () => void
@@ -35,6 +36,7 @@ export default function ExpenseModal({
   errorMessage: string | null
   isEditing?: boolean
   onDelete?: () => void
+  restrictedKinds?: ExpenseFormState['categoryKind'][]
 }) {
   const countries = useTripStore((s) => s.countries)
   const segments = useTripStore((s) => s.segments)
@@ -109,6 +111,14 @@ export default function ExpenseModal({
     }
     return map
   }, [categories])
+
+  const kindOptions = useMemo(() => {
+    const all = Object.keys(CATEGORY_KIND_LABEL) as ExpenseFormState['categoryKind'][]
+    const restricted = new Set((restrictedKinds ?? []).filter(Boolean))
+    const base = all.filter((k) => !restricted.has(k))
+    if (isEditing && restricted.has(form.categoryKind)) return [form.categoryKind, ...base.filter((k) => k !== form.categoryKind)]
+    return base
+  }, [form.categoryKind, isEditing, restrictedKinds])
 
   const subcategories = useMemo(() => {
     return categories
@@ -300,8 +310,8 @@ export default function ExpenseModal({
                   value={form.categoryKind}
                   onChange={(e) => setForm((f) => ({ ...f, categoryKind: e.target.value as ExpenseFormState['categoryKind'], categoryId: '' }))}
                 >
-                  {(Object.keys(CATEGORY_KIND_LABEL) as ExpenseFormState['categoryKind'][]).map((k) => (
-                    <option key={k} value={k}>
+                  {kindOptions.map((k) => (
+                    <option key={k} value={k} disabled={(restrictedKinds ?? []).includes(k) && !(isEditing && form.categoryKind === k)}>
                       {CATEGORY_KIND_LABEL[k]}
                     </option>
                   ))}
