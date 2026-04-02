@@ -42,13 +42,21 @@ async function setLastSyncError(value: string | null) {
   await db.sync_state.put({ key: 'last_sync_error', value: value ?? '' })
 }
 
-async function pullFromSupabase() {
+async function pullFromSupabase(uid: string) {
   const since = await getLastSyncAt()
 
   await Promise.all(
     PULL_SPECS.map(async (spec) => {
       let q = supabase!.from(spec.table).select(spec.select)
+      
+      if (spec.table === 'categorias') {
+        q = q.or(`user_id.eq.${uid},user_id.is.null`)
+      } else {
+        q = q.eq('user_id', uid)
+      }
+
       if (since) q = q.gt('updated_at', since)
+      
       const { data, error } = await q
       if (error) throw error
       if (!data || data.length === 0) return
@@ -67,6 +75,7 @@ export async function syncNow() {
 
   const { data: authData } = await supabase.auth.getSession()
   const uid = authData?.session?.user?.id
+  if (!uid) return
 
   await setLastSyncError(null)
   const syncAttemptTs = nowIso()
@@ -168,7 +177,7 @@ export async function syncNow() {
   }
 
   try {
-    await pullFromSupabase()
+    await pullFromSupabase(uid)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'pull_error'
     await setLastSyncError(message)
