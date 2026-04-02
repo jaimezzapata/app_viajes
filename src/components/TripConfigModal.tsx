@@ -677,30 +677,44 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
                 </div>
               </div>
 
-              {deleteWarningOpen && !isNew ? (
-                <div className="mt-2 rounded-2xl border border-rose-900/60 bg-rose-950/30 p-4">
-                  <div className="text-sm font-bold text-rose-300 mb-1">¿Eliminar este viaje?</div>
-                  <div className="text-xs text-rose-200/80 mb-4">
-                    Se borrarán los datos asociados de tu dispositivo de forma irreversible y no podrás registrar más movimientos para este viaje.
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="rounded-xl px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-900"
-                      onClick={() => setDeleteWarningOpen(false)}
-                      type="button"
+              <AnimatePresence>
+                {deleteWarningOpen && !isNew ? (
+                  <motion.div 
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <motion.div 
+                      className="w-full max-w-sm rounded-3xl border border-rose-900/40 bg-zinc-950 p-6 shadow-2xl"
+                      initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{ scale: 0.95, opacity: 0, y: 10 }}
                     >
-                      Mantener
-                    </button>
-                    <button
-                      className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-500 active:scale-95 transition-all"
-                      onClick={handleDeleteTrip}
-                      type="button"
-                    >
-                      Sí, eliminar viaje
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+                      <div className="mb-3 text-xl font-bold text-rose-400">¿Eliminar este viaje?</div>
+                      <div className="mb-6 text-sm text-zinc-400 leading-relaxed">
+                        Se borrarán los datos asociados de tu dispositivo de forma irreversible y no podrás registrar más movimientos para este viaje.
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          className="rounded-xl px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-900 transition-colors"
+                          onClick={() => setDeleteWarningOpen(false)}
+                          type="button"
+                        >
+                          Mantener
+                        </button>
+                        <button
+                          className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-500 active:scale-95 transition-all"
+                          onClick={handleDeleteTrip}
+                          type="button"
+                        >
+                          Sí, eliminar
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </div>
 
           </motion.div>

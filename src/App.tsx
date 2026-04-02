@@ -36,6 +36,8 @@ function TripSyncer() {
   return null
 }
 
+import GlobalErrorModal from '@/components/GlobalErrorModal'
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,16 +62,24 @@ export default function App() {
   }
 
   if (!session) {
-    return <AuthScreen />
+    return (
+      <>
+        <GlobalErrorModal />
+        <AuthScreen />
+      </>
+    )
   }
 
   return (
-    <BrowserRouter>
-      <TripSyncer />
-      <AppShell>
-        <AnimatedRoutes />
-      </AppShell>
-    </BrowserRouter>
+    <>
+      <GlobalErrorModal />
+      <BrowserRouter>
+        <TripSyncer />
+        <AppShell>
+          <AnimatedRoutes />
+        </AppShell>
+      </BrowserRouter>
+    </>
   )
 }
 
