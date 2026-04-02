@@ -42,11 +42,21 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
   const lastNameRef = useRef('')
   const reqIdRef = useRef(0)
 
+  const initOpenRef = useRef(false)
+
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      initOpenRef.current = false
+      return
+    }
+    if (initOpenRef.current) return
+    initOpenRef.current = true
+
     setStep('config')
     setInitialBudget('')
     setEditingSegData(null)
+    setDeleteWarningOpen(false)
+
     if (isNew) {
       setTripName('Nuevo Viaje')
       const today = new Date()
@@ -70,7 +80,6 @@ export default function TripConfigModal({ open, onClose, isNew }: { open: boolea
         })
       }
     }
-    setDeleteWarningOpen(false)
   }, [open, isNew, activeTripId, countries, segments, globalStartYmd, globalEndYmd, isNational])
 
   const stageOptions = useMemo(
