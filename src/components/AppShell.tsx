@@ -8,7 +8,7 @@ import { syncNow } from '@/sync/sync'
 import { supabase } from '@/supabase/client'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
-import { LogOut, Trash2, RefreshCw, Home as HomeIcon, Check } from 'lucide-react'
+import { LogOut, Trash2, RefreshCw, Home as HomeIcon, Check, HelpCircle } from 'lucide-react'
 import { useTripStore } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { addDays, toYmd } from '@/utils/date'
@@ -57,12 +57,13 @@ export default function AppShell({ children }: PropsWithChildren) {
   }, [])
 
   const isHome = location.pathname === '/inicio'
+  const isGuide = location.pathname === '/guia'
 
   useEffect(() => {
-    if (!isHome && !activeTripId) {
+    if (!isHome && !isGuide && !activeTripId) {
       navigate('/inicio', { replace: true })
     }
-  }, [isHome, activeTripId, navigate])
+  }, [isHome, isGuide, activeTripId, navigate])
 
   async function onSync() {
     if (!online) return
@@ -85,6 +86,10 @@ export default function AppShell({ children }: PropsWithChildren) {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
+  }
+
+  if (isGuide) {
+    return <div className="min-h-dvh bg-white text-zinc-900">{children}</div>
   }
 
   return (
@@ -120,6 +125,14 @@ export default function AppShell({ children }: PropsWithChildren) {
             </div>
             
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                className={`flex items-center justify-center p-2 rounded-xl transition-colors ${isGuide ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'}`}
+                type="button"
+                onClick={() => navigate('/guia')}
+                title="Guía"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
               <button
                 className="flex items-center justify-center p-2 rounded-xl bg-orange-500/10 text-orange-400 transition-colors hover:bg-orange-500/20"
                 type="button"

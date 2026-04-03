@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manual de Usuario — App Viajes</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              ink: {
+                50: '#fafafa',
+                100: '#f4f4f5',
+                200: '#e4e4e7',
+                300: '#d4d4d8',
+                400: '#a1a1aa',
+                500: '#71717a',
+                600: '#52525b',
+                700: '#3f3f46',
+                800: '#27272a',
+                900: '#18181b',
+              },
+            },
+            boxShadow: {
+              soft: '0 12px 30px rgba(24,24,27,.08)',
+            },
+          },
+        },
+      }
+    </script>
+
+    <style>
+      :root {
+        --bg: #ffffff;
+        --ink-900: #18181b;
+        --ink-700: #3f3f46;
+        --ink-500: #71717a;
+        --ink-300: #d4d4d8;
+        --ink-200: #e4e4e7;
+        --ink-100: #f4f4f5;
+        --accent: #2563eb;
+        --accent-2: #0ea5e9;
+      }
+
+      ::-webkit-scrollbar {
+        width: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #e4e4e7;
+        border-radius: 999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #d4d4d8;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      .reveal.is-in {
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 500ms ease, transform 500ms ease;
+      }
+
+      .nav-link.active {
+        color: var(--ink-900);
+        font-weight: 500;
+        border-left-color: var(--ink-900);
+        background: linear-gradient(to right, rgba(24, 24, 27, 0.06), transparent);
+      }
+
+      .mobile-link.active {
+        color: var(--ink-900);
+        font-weight: 500;
+      }
+
+      .progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 2px;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        z-index: 60;
+      }
+    </style>
+  </head>
+
+  <body class="bg-white text-ink-600 font-sans antialiased selection:bg-ink-200 selection:text-ink-900">
+    <div class="progress" id="progress"></div>
+
+    <div class="md:hidden bg-white/80 backdrop-blur-md border-b border-ink-100 p-4 sticky top-0 z-40 flex justify-between items-center">
+      <a href="#top" class="font-medium text-ink-900 flex items-center gap-2">
+        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-ink-100 text-ink-900">
+          <i data-lucide="plane" class="w-5 h-5"></i>
+        </span>
+        <span>App Viajes</span>
+      </a>
+      <button
+        id="mobile-menu-btn"
+        class="inline-flex items-center justify-center rounded-xl border border-ink-200 bg-white px-3 py-2 text-ink-600 hover:text-ink-900 hover:border-ink-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200"
+        aria-label="Abrir menú"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        type="button"
+      >
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div
+      id="mobile-menu"
+      class="fixed inset-0 bg-white z-30 transform translate-x-full transition-transform duration-300 md:hidden pt-20 px-6 pb-8 overflow-y-auto"
+      aria-hidden="true"
+    >
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <div class="text-sm font-medium text-ink-900">Manual de usuario</div>
+          <div class="text-xs text-ink-400 mt-1">Guía paso a paso</div>
+        </div>
+        <button
+          id="mobile-close-btn"
+          class="inline-flex items-center justify-center rounded-xl border border-ink-200 bg-white px-3 py-2 text-ink-600 hover:text-ink-900 hover:border-ink-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200"
+          aria-label="Cerrar menú"
+          type="button"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <nav class="flex flex-col gap-4 text-base" id="mobile-nav">
+        <a href="#introduccion" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Introducción</a>
+        <a href="#conceptos" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Conceptos clave</a>
+        <a href="#flujo" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Primeros pasos</a>
+        <a href="#modulos" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Módulos</a>
+        <a href="#reportes" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Reportes y presupuesto</a>
+        <a href="#sincronizacion" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Sincronización y copias</a>
+        <a href="#diagnostico" class="mobile-link text-ink-500 hover:text-ink-900 transition-colors">Solución de problemas</a>
+      </nav>
+    </div>
+
+    <div id="top" class="flex max-w-7xl mx-auto">
+      <aside class="hidden md:block w-72 h-screen sticky top-0 py-14 pr-10 border-r border-ink-100">
+        <div class="mb-10 pl-4">
+          <a href="#top" class="font-medium text-ink-900 flex items-center gap-2 text-lg">
+            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-ink-100 text-ink-900">
+              <i data-lucide="plane" class="w-5 h-5"></i>
+            </span>
+            <span>App Viajes</span>
+          </a>
+          <p class="text-xs text-ink-400 mt-2 uppercase tracking-widest">Manual de usuario</p>
+        </div>
+
+        <nav class="flex flex-col text-sm gap-0.5" id="sidebar-nav">
+          <a href="#introduccion" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Introducción</a>
+          <a href="#conceptos" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Conceptos clave</a>
+          <a href="#flujo" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Primeros pasos</a>
+          <a href="#modulos" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Módulos</a>
+          <a href="#reportes" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Reportes y presupuesto</a>
+          <a href="#sincronizacion" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Sincronización y copias</a>
+          <a href="#diagnostico" class="nav-link block rounded-lg py-2.5 pl-4 border-l-2 border-transparent text-ink-400 hover:text-ink-900 transition-colors">Solución de problemas</a>
+        </nav>
+
+        <div class="mt-10 pl-4">
+          <div class="rounded-2xl border border-ink-200 bg-ink-50 p-4">
+            <div class="flex items-start gap-3">
+              <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-ink-200 text-ink-700">
+                <i data-lucide="sparkles" class="w-5 h-5"></i>
+              </span>
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-ink-900">Tip rápido</div>
+                <div class="mt-1 text-xs text-ink-500 leading-relaxed">
+                  Si vas a viajar sin internet, registra todo con normalidad. La app lo guardará y luego lo enviará cuando vuelvas a estar en línea.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="flex-1 px-6 py-12 md:py-20 md:px-16 lg:px-24 max-w-4xl">
+        <header class="mb-16 md:mb-24 flex flex-col lg:flex-row gap-10 items-stretch">
+          <div class="flex-1 reveal">
+            <div class="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-600">
+              <span class="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+              Manual de usuario final
+            </div>
+            <h1 class="mt-5 text-3xl md:text-5xl font-light text-ink-900 tracking-tight leading-[1.05]">Guía práctica para tu viaje</h1>
+            <p class="mt-6 text-lg leading-relaxed text-ink-500 font-light">
+              Aprende a planificar, registrar y controlar tu viaje día a día: agenda, gastos, presupuesto y reportes. Todo explicado con pasos claros.
+            </p>
+
+            <div class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                  </span>
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-ink-900">Agenda</div>
+                    <div class="text-xs text-ink-500">día a día</div>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                  </span>
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-ink-900">Gastos</div>
+                    <div class="text-xs text-ink-500">en monedas</div>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-ink-200 bg-white p-4 shadow-sm">
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                  </span>
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-ink-900">Reportes</div>
+                    <div class="text-xs text-ink-500">totales y alertas</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 w-full rounded-3xl border border-ink-200 bg-ink-50 p-6 shadow-soft relative overflow-hidden reveal">
+            <div class="absolute inset-0 pointer-events-none">
+              <div class="absolute -top-24 -right-28 h-56 w-56 rounded-full bg-blue-200/50 blur-2xl"></div>
+              <div class="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-emerald-200/40 blur-2xl"></div>
+            </div>
+            <div class="relative">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-ink-900">
+                  <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-ink-200">
+                    <i data-lucide="map-pin" class="w-5 h-5 text-ink-700"></i>
+                  </span>
+                  <div class="text-sm font-medium">Tu viaje, organizado</div>
+                </div>
+                <div class="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs text-ink-500">
+                  <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                  Listo
+                </div>
+              </div>
+
+              <div class="mt-6 grid grid-cols-3 gap-2">
+                <div class="rounded-2xl border border-ink-200 bg-white p-3">
+                  <div class="h-2 bg-ink-200 rounded w-1/2"></div>
+                  <div class="mt-2 h-2 bg-ink-100 rounded w-3/4"></div>
+                </div>
+                <div class="rounded-2xl border border-blue-200 bg-blue-600 p-3">
+                  <div class="h-2 bg-blue-300 rounded w-1/2"></div>
+                  <div class="mt-2 h-2 bg-blue-300/70 rounded w-4/5"></div>
+                </div>
+                <div class="rounded-2xl border border-ink-200 bg-white p-3">
+                  <div class="h-2 bg-ink-200 rounded w-1/2"></div>
+                  <div class="mt-2 h-2 bg-ink-100 rounded w-2/3"></div>
+                </div>
+              </div>
+
+              <div class="mt-4 space-y-3">
+                <div class="rounded-2xl border border-ink-200 bg-white p-4 flex items-center gap-4">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-700">
+                    <i data-lucide="route" class="w-5 h-5"></i>
+                  </span>
+                  <div class="flex-1">
+                    <div class="h-2 bg-ink-200 rounded w-2/5"></div>
+                    <div class="mt-2 h-2 bg-ink-100 rounded w-1/3"></div>
+                  </div>
+                  <div class="h-7 w-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-ink-200 bg-white p-4 flex items-center gap-4">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-700">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                  </span>
+                  <div class="flex-1">
+                    <div class="h-2 bg-ink-200 rounded w-3/5"></div>
+                    <div class="mt-2 h-2 bg-ink-100 rounded w-2/5"></div>
+                  </div>
+                  <div class="h-7 w-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section id="introduccion" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-6">1. Introducción</h2>
+          <div class="space-y-4 font-light leading-relaxed">
+            <p>
+              App Viajes es una herramienta diseñada para gestionar cada aspecto de tu viaje: desde tu agenda diaria (vuelos, hoteles, tours) hasta el control de tu presupuesto en diferentes monedas.
+            </p>
+            <p>
+              La idea es simple: anotas lo que planeas y lo que vas haciendo, y la app te ayuda a ver todo ordenado para que no se te pase nada.
+            </p>
+          </div>
+        </section>
+
+        <section id="conceptos" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-8">2. Conceptos clave</h2>
+
+          <div class="grid md:grid-cols-3 gap-6 font-light">
+            <div class="bg-white border border-ink-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div class="w-12 h-12 rounded-xl bg-ink-100 text-ink-700 flex items-center justify-center mb-5">
+                <i data-lucide="wifi-off" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-base font-medium text-ink-900 mb-3">Funciona sin internet</h3>
+              <p class="text-sm leading-relaxed text-ink-500">
+                Puedes registrar tu agenda y tus gastos sin conexión. Cuando vuelvas a estar en línea, la app enviará todo automáticamente.
+              </p>
+            </div>
+
+            <div class="bg-white border border-ink-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-5">
+                <i data-lucide="link" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-base font-medium text-ink-900 mb-3">Costo automático</h3>
+              <p class="text-sm leading-relaxed text-ink-500">
+                Si agregas costo a un vuelo, hotel o actividad, ese valor queda también reflejado en tu control de gastos para que no tengas que escribirlo dos veces.
+              </p>
+            </div>
+
+            <div class="bg-white border border-ink-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-5">
+                <i data-lucide="map" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-base font-medium text-ink-900 mb-3">Tramos del viaje</h3>
+              <p class="text-sm leading-relaxed text-ink-500">
+                Indicas en qué fechas estarás en cada país. Así, cuando registres algo, la app te ayuda a elegir el lugar correcto y su moneda.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="flujo" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-8">3. Primeros pasos</h2>
+
+          <div class="rounded-3xl border border-ink-200 bg-ink-50 p-6">
+            <div class="relative font-light mt-2">
+              <div class="hidden md:block absolute top-6 left-10 right-10 h-[2px] bg-ink-200/70 z-0"></div>
+              <div class="md:hidden absolute top-10 bottom-10 left-6 w-[2px] bg-ink-200/70 z-0"></div>
+
+              <div class="grid md:grid-cols-3 gap-10 md:gap-6 relative z-10">
+                <div class="flex md:flex-col items-start md:items-center gap-4 text-left md:text-center">
+                  <div class="w-12 h-12 rounded-full bg-white border-2 border-blue-600 text-blue-600 font-medium flex items-center justify-center text-lg shrink-0 shadow-sm">
+                    1
+                  </div>
+                  <div>
+                    <h3 class="text-base font-medium text-ink-900 mb-2">Crear y configurar el viaje</h3>
+                    <p class="text-sm leading-relaxed text-ink-500">Crea tu viaje, define fechas y agrega los países (o destinos) que visitarás.</p>
+                  </div>
+                </div>
+
+                <div class="flex md:flex-col items-start md:items-center gap-4 text-left md:text-center">
+                  <div class="w-12 h-12 rounded-full bg-white border-2 border-ink-300 text-ink-500 font-medium flex items-center justify-center text-lg shrink-0 shadow-sm">
+                    2
+                  </div>
+                  <div>
+                    <h3 class="text-base font-medium text-ink-900 mb-2">Definir tramos</h3>
+                    <p class="text-sm leading-relaxed text-ink-500">Indica en qué fechas estarás en cada país para que la agenda y los gastos queden ordenados.</p>
+                  </div>
+                </div>
+
+                <div class="flex md:flex-col items-start md:items-center gap-4 text-left md:text-center">
+                  <div class="w-12 h-12 rounded-full bg-white border-2 border-ink-300 text-ink-500 font-medium flex items-center justify-center text-lg shrink-0 shadow-sm">
+                    3
+                  </div>
+                  <div>
+                    <h3 class="text-base font-medium text-ink-900 mb-2">Usar la app día a día</h3>
+                    <p class="text-sm leading-relaxed text-ink-500">Registra vuelos, hoteles y actividades; y agrega gastos sobre la marcha.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="modulos" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-6">4. Módulos principales</h2>
+          <p class="font-light mb-8 text-ink-500">Toca cada módulo para ver qué hace y cómo usarlo.</p>
+
+          <div class="border-t border-ink-100 font-light" id="accordion">
+            <div class="border-b border-ink-100">
+              <button class="accordion-btn w-full flex justify-between items-center py-5 text-left text-ink-900 hover:text-ink-600 transition-colors" aria-expanded="false" type="button">
+                <span class="flex items-center gap-3"><i data-lucide="calendar" class="w-5 h-5 text-ink-400"></i> Calendario</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 transform"></i>
+              </button>
+              <div class="accordion-panel overflow-hidden" style="max-height: 0px;">
+                <div class="pb-6 pl-8 flex flex-col md:flex-row gap-8 items-start">
+                  <div class="text-ink-500 flex-1">
+                    <p class="mb-3">Es tu centro de operaciones. Tiene dos vistas:</p>
+                    <ul class="list-disc list-outside ml-4 space-y-2 text-sm">
+                      <li><span class="font-medium text-ink-900">Vista Mes:</span> resumen rápido por día.</li>
+                      <li><span class="font-medium text-ink-900">Agenda:</span> detalle ordenado de vuelos, reservas, actividades y gastos.</li>
+                    </ul>
+                    <div class="mt-4 rounded-2xl border border-ink-200 bg-ink-50 p-4 text-sm">
+                      <div class="flex items-start gap-3">
+                        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-ink-200 text-ink-700">
+                          <i data-lucide="target" class="w-5 h-5"></i>
+                        </span>
+                        <div class="min-w-0">
+                          <div class="font-medium text-ink-900">Tip</div>
+                          <div class="mt-1 text-ink-500">Usa el Calendario como lista de tareas del día: lo que tienes, lo que falta y lo que ya hiciste.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="w-full md:w-52 bg-ink-50 border border-ink-200 rounded-2xl p-4 shrink-0">
+                    <div class="flex justify-between items-center mb-3">
+                      <div class="h-3 bg-ink-300 rounded w-16"></div>
+                      <div class="flex gap-1">
+                        <div class="w-2 h-2 bg-ink-300 rounded-full"></div>
+                        <div class="w-2 h-2 bg-ink-300 rounded-full"></div>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 mb-2">
+                      <div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div><div class="h-4 bg-ink-200 rounded-sm"></div>
+                      <div class="h-7 bg-white border border-ink-100 rounded-sm"></div><div class="h-7 bg-white border border-ink-100 rounded-sm"></div><div class="h-7 bg-blue-100 border border-blue-200 rounded-sm"></div><div class="h-7 bg-white border border-ink-100 rounded-sm"></div><div class="h-7 bg-white border border-ink-100 rounded-sm"></div><div class="h-7 bg-white border border-ink-100 rounded-sm"></div><div class="h-7 bg-white border border-ink-100 rounded-sm"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-b border-ink-100">
+              <button class="accordion-btn w-full flex justify-between items-center py-5 text-left text-ink-900 hover:text-ink-600 transition-colors" aria-expanded="false" type="button">
+                <span class="flex items-center gap-3"><i data-lucide="route" class="w-5 h-5 text-ink-400"></i> Itinerario (trayectos)</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 transform"></i>
+              </button>
+              <div class="accordion-panel overflow-hidden" style="max-height: 0px;">
+                <div class="pb-6 pl-8 flex flex-col md:flex-row gap-8 items-start">
+                  <div class="text-ink-500 flex-1">
+                    <p class="mb-3">Aquí registras cómo te mueves: vuelos, trenes, buses, auto y más.</p>
+                    <ul class="list-disc list-outside ml-4 space-y-2 text-sm">
+                      <li>Indica origen, destino y horarios. En vuelos puedes guardar detalles útiles como aerolíneas y escalas.</li>
+                      <li><span class="font-medium text-ink-900">Costo:</span> si agregas un valor, queda reflejado en tus gastos automáticamente.</li>
+                    </ul>
+                    <div class="mt-4 rounded-2xl border border-ink-200 bg-blue-50 p-4 text-sm text-blue-900">
+                      <div class="flex items-start gap-3">
+                        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-blue-200 text-blue-700">
+                          <i data-lucide="lightbulb" class="w-5 h-5"></i>
+                        </span>
+                        <div class="min-w-0">
+                          <div class="font-medium">Tip</div>
+                          <div class="mt-1 text-blue-800/80">Registra primero los trayectos “grandes” (vuelos o trenes). Luego completa los movimientos cortos.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="w-full md:w-52 bg-white border border-ink-200 rounded-2xl p-4 shrink-0 shadow-sm relative">
+                    <div class="absolute left-7 top-6 bottom-6 w-[2px] border-l-2 border-dashed border-ink-200"></div>
+                    <div class="flex gap-3 items-center mb-4 relative z-10">
+                      <div class="w-4 h-4 rounded-full border-2 border-blue-600 bg-white"></div>
+                      <div class="h-2 bg-ink-200 rounded w-20"></div>
+                    </div>
+                    <div class="flex gap-3 items-center mb-4 relative z-10">
+                      <div class="w-4 h-4 rounded-full border-2 border-blue-600 bg-white"></div>
+                      <div class="h-2 bg-ink-200 rounded w-24"></div>
+                    </div>
+                    <div class="flex gap-3 items-center relative z-10">
+                      <div class="w-4 h-4 rounded-full border-2 border-blue-600 bg-white"></div>
+                      <div class="h-2 bg-ink-200 rounded w-16"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-b border-ink-100">
+              <button class="accordion-btn w-full flex justify-between items-center py-5 text-left text-ink-900 hover:text-ink-600 transition-colors" aria-expanded="false" type="button">
+                <span class="flex items-center gap-3"><i data-lucide="bed-double" class="w-5 h-5 text-ink-400"></i> Hospedaje</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 transform"></i>
+              </button>
+              <div class="accordion-panel overflow-hidden" style="max-height: 0px;">
+                <div class="pb-6 pl-8 text-ink-500">
+                  <p class="text-sm leading-relaxed">
+                    Registra hoteles, Airbnb o cualquier alojamiento. Agrega ciudad, fechas de check-in y check-out, dirección y notas útiles (por ejemplo: número de reserva).
+                  </p>
+                  <p class="mt-3 text-sm leading-relaxed">
+                    Si agregas el costo total de la reserva, quedará reflejado en tus gastos automáticamente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-b border-ink-100">
+              <button class="accordion-btn w-full flex justify-between items-center py-5 text-left text-ink-900 hover:text-ink-600 transition-colors" aria-expanded="false" type="button">
+                <span class="flex items-center gap-3"><i data-lucide="camera" class="w-5 h-5 text-ink-400"></i> Actividades</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 transform"></i>
+              </button>
+              <div class="accordion-panel overflow-hidden" style="max-height: 0px;">
+                <div class="pb-6 pl-8 text-ink-500">
+                  <p class="text-sm leading-relaxed">
+                    Registra tours, visitas a museos, eventos o reservas en restaurantes. Puedes asignar horas de inicio y fin para tener tu día bien organizado.
+                  </p>
+                  <p class="mt-3 text-sm leading-relaxed">
+                    Si tuvo costo (entradas, reservas, etc.), se reflejará en tus gastos automáticamente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-b border-ink-100">
+              <button class="accordion-btn w-full flex justify-between items-center py-5 text-left text-ink-900 hover:text-ink-600 transition-colors" aria-expanded="false" type="button">
+                <span class="flex items-center gap-3"><i data-lucide="wallet" class="w-5 h-5 text-ink-400"></i> Gastos</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 transform"></i>
+              </button>
+              <div class="accordion-panel overflow-hidden" style="max-height: 0px;">
+                <div class="pb-6 pl-8 flex flex-col md:flex-row gap-8 items-start">
+                  <div class="text-ink-500 space-y-4 flex-1">
+                    <p class="text-sm leading-relaxed">Aquí registras compras sueltas (comida, regalos, imprevistos) y controlas lo que vas gastando.</p>
+                    <div class="bg-amber-50 p-4 rounded-2xl text-sm text-amber-900 border border-amber-200">
+                      <div class="flex items-start gap-3">
+                        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-amber-200 text-amber-700">
+                          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                        </span>
+                        <div class="min-w-0">
+                          <div class="font-medium">Importante</div>
+                          <div class="mt-1 text-amber-800/80">
+                            Los costos de vuelos, hospedaje y actividades se registran desde sus módulos para que queden también en tu agenda.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="text-sm leading-relaxed">
+                      Si registras un gasto en moneda extranjera, la app te ayuda a convertirlo para comparar todo con tu presupuesto.
+                    </p>
+                  </div>
+                  <div class="w-full md:w-52 bg-ink-50 border border-ink-200 rounded-2xl p-4 shrink-0 flex flex-col gap-2">
+                    <div class="bg-white p-3 border border-ink-100 rounded-2xl flex justify-between items-center shadow-sm">
+                      <div class="flex gap-2 items-center">
+                        <div class="w-4 h-4 rounded-full bg-rose-100"></div>
+                        <div class="h-2 bg-ink-200 rounded w-16"></div>
+                      </div>
+                      <div class="h-2 bg-ink-300 rounded w-10"></div>
+                    </div>
+                    <div class="bg-white p-3 border border-ink-100 rounded-2xl flex justify-between items-center shadow-sm">
+                      <div class="flex gap-2 items-center">
+                        <div class="w-4 h-4 rounded-full bg-emerald-100"></div>
+                        <div class="h-2 bg-ink-200 rounded w-20"></div>
+                      </div>
+                      <div class="h-2 bg-ink-300 rounded w-12"></div>
+                    </div>
+                    <div class="bg-white p-3 border border-ink-100 rounded-2xl flex justify-between items-center shadow-sm">
+                      <div class="flex gap-2 items-center">
+                        <div class="w-4 h-4 rounded-full bg-blue-100"></div>
+                        <div class="h-2 bg-ink-200 rounded w-14"></div>
+                      </div>
+                      <div class="h-2 bg-ink-300 rounded w-8"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="reportes" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-6">5. Reportes y presupuesto</h2>
+          <div class="grid sm:grid-cols-3 gap-6 font-light">
+            <div class="bg-ink-50 rounded-2xl p-6 border border-ink-100 text-center flex flex-col items-center">
+              <div class="w-16 h-16 flex items-end justify-center gap-1 mb-4">
+                <div class="w-3 bg-blue-200 rounded-t h-2/5"></div>
+                <div class="w-3 bg-blue-400 rounded-t h-3/5"></div>
+                <div class="w-3 bg-blue-600 rounded-t h-full"></div>
+              </div>
+              <h3 class="text-sm font-medium text-ink-900 mb-2 uppercase tracking-wide">Totales</h3>
+              <p class="text-xs leading-relaxed text-ink-500">Mira lo gastado vs tu presupuesto y el detalle por país y por tipo de gasto.</p>
+            </div>
+
+            <div class="bg-ink-50 rounded-2xl p-6 border border-ink-100 text-center flex flex-col items-center">
+              <div class="w-16 h-16 flex items-center justify-center mb-4 relative">
+                <div class="absolute inset-0 border-4 border-amber-200 rounded-full border-t-amber-500 rotate-45"></div>
+                <i data-lucide="bell" class="w-5 h-5 text-amber-600"></i>
+              </div>
+              <h3 class="text-sm font-medium text-ink-900 mb-2 uppercase tracking-wide">Alertas</h3>
+              <p class="text-xs leading-relaxed text-ink-500">Avisos cuando te acerques al límite o cuando algo requiera atención.</p>
+            </div>
+
+            <div class="bg-ink-50 rounded-2xl p-6 border border-ink-100 text-center flex flex-col items-center">
+              <div class="w-16 h-16 flex flex-col justify-center gap-2 mb-4">
+                <div class="h-2 bg-ink-300 rounded w-full"></div>
+                <div class="h-2 bg-ink-200 rounded w-4/5"></div>
+                <div class="h-2 bg-ink-200 rounded w-3/5"></div>
+              </div>
+              <h3 class="text-sm font-medium text-ink-900 mb-2 uppercase tracking-wide">Top gastos</h3>
+              <p class="text-xs leading-relaxed text-ink-500">Un listado rápido con los gastos más altos para ubicar “los grandes”.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="sincronizacion" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-6">6. Sincronización y copias de seguridad</h2>
+          <div class="space-y-6 font-light">
+            <p class="leading-relaxed text-ink-500">
+              Si estás sin internet, la app seguirá funcionando. Cuando detecte conexión, enviará tus cambios automáticamente. También puedes usar el botón <span class="font-medium text-ink-900">Sincronizar</span> para hacerlo manualmente.
+            </p>
+
+            <div class="rounded-3xl border border-ink-200 bg-ink-50 p-6">
+              <div class="flex items-start gap-3">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white border border-ink-200 text-ink-700">
+                  <i data-lucide="download" class="w-5 h-5"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-ink-900">Exportar desde Reportes</div>
+                  <div class="mt-1 text-sm text-ink-500">Puedes sacar una copia de tu viaje para guardarla o compartirla.</div>
+                </div>
+              </div>
+
+              <ul class="mt-4 list-none space-y-3 pl-4 border-l border-ink-200">
+                <li class="text-sm text-ink-500"><span class="font-medium text-ink-900">PDF:</span> resumen visual del viaje.</li>
+                <li class="text-sm text-ink-500"><span class="font-medium text-ink-900">Excel:</span> detalle en formato tabla.</li>
+                <li class="text-sm text-ink-500"><span class="font-medium text-ink-900">Copia completa:</span> guarda toda la configuración del viaje para restaurar si lo necesitas.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="diagnostico" class="mb-20 md:mb-24 scroll-mt-24 section-spy reveal">
+          <h2 class="text-xl font-medium text-ink-900 mb-6">7. Solución de problemas</h2>
+          <div class="space-y-4 font-light">
+            <p class="leading-relaxed text-ink-500">
+              Si notas que algo no cuadra (por ejemplo: un día vacío, un gasto que no aparece o una reserva que no se ve), usa la sección de <span class="font-medium text-ink-900">Diagnóstico</span> desde Reportes.
+            </p>
+            <p class="leading-relaxed text-ink-500">Te ayuda a detectar situaciones comunes como:</p>
+            <ul class="list-disc list-outside ml-4 space-y-1 text-sm text-ink-500">
+              <li>Fechas del viaje mal configuradas.</li>
+              <li>Tramos de fechas que se superponen.</li>
+              <li>Registros guardados fuera del rango del viaje.</li>
+            </ul>
+            <div class="mt-4 rounded-3xl border border-ink-200 bg-white p-6">
+              <div class="flex items-start gap-3">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-ink-100 text-ink-800">
+                  <i data-lucide="life-buoy" class="w-5 h-5"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-ink-900">Recomendación</div>
+                  <div class="mt-1 text-sm text-ink-500">
+                    Si vas a hacer cambios grandes (borrar cosas, limpiar o mover información), primero exporta una copia completa desde Reportes.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="pt-8 border-t border-ink-100 text-xs text-ink-400 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+          <span>App Viajes — Manual de usuario.</span>
+          <span>Diseñado para simplificar tu ruta.</span>
+        </footer>
+      </main>
+    </div>
+
+    <button
+      id="to-top"
+      type="button"
+      class="fixed bottom-6 right-6 hidden items-center gap-2 rounded-full border border-ink-200 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-soft hover:text-ink-900 hover:border-ink-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200"
+      aria-label="Volver arriba"
+      title="Volver arriba"
+    >
+      <i data-lucide="arrow-up" class="w-4 h-4"></i>
+      Arriba
+    </button>
+
+    <script>
+      lucide.createIcons()
+
+      const mobileMenuBtn = document.getElementById('mobile-menu-btn')
+      const mobileCloseBtn = document.getElementById('mobile-close-btn')
+      const mobileMenu = document.getElementById('mobile-menu')
+      const mobileLinks = Array.from(document.querySelectorAll('.mobile-link'))
+      const sidebarLinks = Array.from(document.querySelectorAll('.nav-link'))
+
+      const toTop = document.getElementById('to-top')
+      const progress = document.getElementById('progress')
+
+      function setMenu(open) {
+        if (open) {
+          mobileMenu.classList.remove('translate-x-full')
+          mobileMenuBtn.setAttribute('aria-expanded', 'true')
+          mobileMenu.setAttribute('aria-hidden', 'false')
+          document.body.style.overflow = 'hidden'
+        } else {
+          mobileMenu.classList.add('translate-x-full')
+          mobileMenuBtn.setAttribute('aria-expanded', 'false')
+          mobileMenu.setAttribute('aria-hidden', 'true')
+          document.body.style.overflow = ''
+        }
+      }
+
+      mobileMenuBtn.addEventListener('click', () => setMenu(true))
+      mobileCloseBtn.addEventListener('click', () => setMenu(false))
+      mobileLinks.forEach((l) => l.addEventListener('click', () => setMenu(false)))
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setMenu(false)
+      })
+
+      function updateProgress() {
+        const doc = document.documentElement
+        const scrollTop = doc.scrollTop || document.body.scrollTop
+        const scrollHeight = doc.scrollHeight - doc.clientHeight
+        const pct = scrollHeight > 0 ? Math.min(1, Math.max(0, scrollTop / scrollHeight)) : 0
+        progress.style.width = `${Math.round(pct * 100)}%`
+        if (scrollTop > 600) toTop.classList.remove('hidden')
+        else toTop.classList.add('hidden')
+      }
+
+      toTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      })
+
+      window.addEventListener('scroll', updateProgress, { passive: true })
+      updateProgress()
+
+      const accordions = Array.from(document.querySelectorAll('.accordion-btn'))
+      accordions.forEach((btn) => {
+        const panel = btn.nextElementSibling
+        const icon = btn.querySelector('.lucide-chevron-down')
+        btn.addEventListener('click', () => {
+          const isOpen = btn.getAttribute('aria-expanded') === 'true'
+          btn.setAttribute('aria-expanded', String(!isOpen))
+          icon.classList.toggle('rotate-180', !isOpen)
+          if (!isOpen) {
+            panel.style.maxHeight = panel.scrollHeight + 'px'
+          } else {
+            panel.style.maxHeight = '0px'
+          }
+        })
+      })
+
+      const revealEls = Array.from(document.querySelectorAll('.reveal'))
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) e.target.classList.add('is-in')
+          }
+        },
+        { root: null, threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
+      )
+      revealEls.forEach((el) => revealObserver.observe(el))
+
+      const sections = Array.from(document.querySelectorAll('.section-spy'))
+      const spyObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue
+            const id = entry.target.getAttribute('id')
+            sidebarLinks.forEach((l) => l.classList.remove('active'))
+            mobileLinks.forEach((l) => l.classList.remove('active'))
+            const activeSide = document.querySelector(`.nav-link[href="#${id}"]`)
+            const activeMobile = document.querySelector(`.mobile-link[href="#${id}"]`)
+            if (activeSide) activeSide.classList.add('active')
+            if (activeMobile) activeMobile.classList.add('active')
+          }
+        },
+        { root: null, rootMargin: '0px 0px -65% 0px', threshold: 0.12 }
+      )
+      sections.forEach((s) => spyObserver.observe(s))
+
+      window.addEventListener('resize', () => {
+        accordions.forEach((btn) => {
+          const panel = btn.nextElementSibling
+          if (btn.getAttribute('aria-expanded') === 'true') {
+            panel.style.maxHeight = panel.scrollHeight + 'px'
+          }
+        })
+      })
+    </script>
+  </body>
+</html>
+

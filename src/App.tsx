@@ -18,6 +18,7 @@ import Activities from '@/pages/Activities'
 import Reports from '@/pages/Reports'
 import Diagnostics from '@/pages/Diagnostics'
 import Home from '@/pages/Home'
+import Guide from '@/pages/Guide'
 import SharedTrip from './pages/SharedTrip'
 
 function TripSyncer() {
@@ -120,6 +121,7 @@ function AnimatedRoutes() {
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Navigate to="/inicio" replace />} />
         <Route path="/inicio" element={<Home />} />
+        <Route path="/guia" element={<Guide />} />
         <Route path="/calendario" element={<Calendar />} />
         <Route path="/gastos" element={<Expenses />} />
         <Route path="/itinerario" element={<Itinerary />} />
