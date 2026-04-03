@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plane, LogIn, User, Lock, UserPlus, FileWarning } from 'lucide-react'
+import { useNoticeStore } from '@/stores/noticeStore'
 
 export default function AuthScreen() {
   const [username, setUsername] = useState('')
@@ -9,6 +10,7 @@ export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const show = useNoticeStore((s) => s.show)
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault()
@@ -24,7 +26,7 @@ export default function AuthScreen() {
       } else {
         const { error } = await supabase.auth.signUp({ email: fakeEmail, password: pin })
         if (error) throw error
-        alert('Cuenta creada exitosamente. ¡Ya puedes iniciar sesión!')
+        show({ kind: 'success', message: 'Cuenta creada exitosamente. ¡Ya puedes iniciar sesión!' })
         setIsLogin(true)
       }
     } catch (err: any) {

@@ -7,23 +7,29 @@ import { CATEGORY_KIND_COLOR, CATEGORY_KIND_LABEL } from '@/utils/categoryPalett
 import { nowIso, newId } from '@/utils/id'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useTripStore } from '@/stores/tripStore'
-import { Download, FileText, FileSpreadsheet, ChevronDown, Share2 } from 'lucide-react'
+import { Download, FileText, FileSpreadsheet, ChevronDown, Share2, Pencil, Check, X } from 'lucide-react'
 import { exportConsolidatedExcel, exportExecutivePdf } from '@/utils/export'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
 import { normalizeCountryFlag } from '@/utils/flags'
 import FlagAvatar from '@/components/FlagAvatar'
 import { exportTripBackup, importTripBackup, type TripBackupV1 } from '@/utils/tripBackup'
+import { getTripShareToken, setTripShareToken, tripShareUrl } from '@/utils/tripShare'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/supabase/client'
+import { useNoticeStore } from '@/stores/noticeStore'
+import ShareLinkModal from '@/components/ShareLinkModal'
 
 export default function Reports() {
   useDynamicHead('Reportes', 'BarChart3')
   const navigate = useNavigate()
+  const show = useNoticeStore((s) => s.show)
   const countries = useTripStore((s) => s.countries)
   const activeTripId = useTripStore((s) => s.activeTripId)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
 
   const handleExport = useCallback(async (format: 'pdf' | 'excel') => {
@@ -39,11 +45,11 @@ export default function Reports() {
       }
     } catch(err) {
       console.error(err)
-      alert("Error al exportar reporte. Revisa la consola.")
+      show({ kind: 'error', message: 'Error al exportar reporte.' })
     } finally {
       setExporting(false)
     }
-  }, [activeTripId, countries])
+  }, [activeTripId, countries, show])
 
   const handleExportBackup = useCallback(async () => {
     if (!activeTripId) return
@@ -63,11 +69,11 @@ export default function Reports() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error(err)
-      alert('Error exportando backup. Revisa la consola.')
+      show({ kind: 'error', message: 'Error exportando backup.' })
     } finally {
       setExporting(false)
     }
-  }, [activeTripId])
+  }, [activeTripId, show])
 
   const handleImportBackupFile = useCallback(async (file: File) => {
     setExporting(true)
@@ -76,41 +82,57 @@ export default function Reports() {
       const text = await file.text()
       const parsed = JSON.parse(text) as TripBackupV1
       const newTripId = await importTripBackup(parsed)
-      alert(`Backup importado. Se creó un nuevo viaje: ${newTripId}`)
+      show({ kind: 'success', message: `Backup importado. Nuevo viaje: ${newTripId}` })
       await syncNow()
     } catch (err) {
       console.error(err)
-      alert('Error importando backup. Verifica que el archivo JSON sea válido.')
+      show({ kind: 'error', message: 'Error importando backup. Verifica que el archivo JSON sea válido.' })
     } finally {
       setExporting(false)
     }
-  }, [])
+  }, [show])
 
   const handleCreateShareLink = useCallback(async () => {
     if (!activeTripId) return
+    setDownloadOpen(false)
+
+    const cached = await getTripShareToken(activeTripId)
+    if (cached) {
+      const url = tripShareUrl(cached)
+      try {
+        await navigator.clipboard.writeText(url)
+        show({ kind: 'success', message: 'Link copiado al portapapeles.' })
+      } catch {
+        setShareUrl(url)
+        setShareOpen(true)
+      }
+      return
+    }
+
     if (!supabase) {
-      alert('Supabase no está configurado. No se puede generar el link.')
+      show({ kind: 'error', message: 'Supabase no está configurado. No se puede generar el link.' })
       return
     }
     setExporting(true)
-    setDownloadOpen(false)
     try {
       const { data, error } = await supabase.rpc('create_trip_share', { p_trip_id: activeTripId })
       if (error) throw error
-      const url = `${window.location.origin}/compartir/${data}`
+      await setTripShareToken(activeTripId, data)
+      const url = tripShareUrl(data)
       try {
         await navigator.clipboard.writeText(url)
-        alert('Link copiado al portapapeles.')
+        show({ kind: 'success', message: 'Link copiado al portapapeles.' })
       } catch {
-        alert(url)
+        setShareUrl(url)
+        setShareOpen(true)
       }
     } catch (err) {
       console.error(err)
-      alert('Error generando link para compartir. Revisa la consola.')
+      show({ kind: 'error', message: 'Error generando link para compartir.' })
     } finally {
       setExporting(false)
     }
-  }, [activeTripId])
+  }, [activeTripId, show])
 
   const { value: categories = [] } = useLiveQuery<AppCategory[]>(async () => await db.categorias.filter((c) => c.deleted_at == null).toArray(), [], [])
   const { value: expenses = [] } = useLiveQuery<AppExpense[]>(
@@ -588,6 +610,7 @@ export default function Reports() {
         </div>
       </div>
 
+      <ShareLinkModal open={shareOpen} url={shareUrl} onClose={() => setShareOpen(false)} />
     </Page>
   )
 }
@@ -608,7 +631,9 @@ function BudgetHero({
   spentTotal: number
   onSave: (amountCop: number) => void
 }) {
+  const show = useNoticeStore((s) => s.show)
   const [value, setValue] = useState<string>(() => (budgetTotal ? String(budgetTotal) : ''))
+  const [editing, setEditing] = useState(() => !budgetTotal)
   const prevBudget = useRef<number>(budgetTotal)
 
   useEffect(() => {
@@ -627,10 +652,13 @@ function BudgetHero({
     return Number.isFinite(n) ? Math.max(0, Math.round(n)) : NaN
   }, [value])
 
-  const canSave = Number.isFinite(parsed)
+  const canSave = Number.isFinite(parsed) && parsed !== budgetTotal
 
-  const spentRatio = budgetTotal > 0 ? Math.min(1, spentTotal / budgetTotal) : 0
-  const spentPctLabel = budgetTotal > 0 ? formatPct(spentRatio) : '0%'
+  const spentPctRaw = budgetTotal > 0 ? spentTotal / budgetTotal : 0
+  const spentPctLabel =
+    budgetTotal > 0
+      ? (spentPctRaw > 0 && spentPctRaw < 0.01 ? '<1%' : `${Math.round(spentPctRaw * 100)}%`)
+      : '0%'
   const donutSegments = useMemo(
     () => [
       { value: spentTotal, color: '#f43f5e' },
@@ -639,42 +667,90 @@ function BudgetHero({
     [budgetTotal, spentTotal],
   )
 
+  const overspent = budgetTotal > 0 && spentTotal > budgetTotal
+
   return (
     <div className="rounded-3xl border border-zinc-900 bg-gradient-to-b from-zinc-950/70 to-zinc-950/40 p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Presupuesto global</div>
-          <div className="mt-2 text-3xl font-semibold leading-none text-zinc-50">{formatCop(remaining)}</div>
-          <div className="mt-2 text-sm text-zinc-300">restante</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Presupuesto global</div>
+        <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${overspent ? 'border-rose-900/50 bg-rose-950/30 text-rose-300' : 'border-zinc-800 bg-zinc-950/60 text-zinc-200'}`}>
+          <i className="h-2 w-2 rounded-full" style={{ backgroundColor: '#f43f5e', display: 'inline-block' }} />
+          {spentPctLabel} gastado
+        </div>
+      </div>
 
-          <div className="mt-3 text-xs text-zinc-400">Gastado: {formatCop(spentTotal)} · Total: {formatCop(budgetTotal)}</div>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+        <div className="min-w-0">
+          <div className="text-3xl font-semibold leading-none text-zinc-50">{formatCop(remaining)}</div>
+          <div className="mt-2 text-sm text-zinc-300">{overspent ? 'Presupuesto excedido' : 'Disponible'}</div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+              <div className="text-[11px] text-zinc-400">Gastado</div>
+              <div className={`mt-1 text-sm font-semibold ${overspent ? 'text-rose-300' : 'text-zinc-100'}`}>{formatCop(spentTotal)}</div>
+            </div>
+            <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+              <div className="text-[11px] text-zinc-400">Presupuesto</div>
+              <div className="mt-1 text-sm font-semibold text-zinc-100">{budgetTotal > 0 ? formatCop(budgetTotal) : 'Sin definir'}</div>
+            </div>
+          </div>
 
           <div className="mt-4">
-            <div className="text-[11px] text-zinc-400">Definir presupuesto (COP)</div>
-            <div className="mt-1 flex items-center gap-2">
-              <input
-                className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm"
-                inputMode="numeric"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="Ej: 5.000.000"
-              />
+            {!editing ? (
               <button
-                className="rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
-                disabled={!canSave}
-                onClick={() => {
-                  if (!Number.isFinite(parsed)) return
-                  onSave(parsed)
-                }}
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-900"
               >
-                Guardar
+                <Pencil className="h-4 w-4 text-zinc-400" />
+                {budgetTotal > 0 ? 'Editar presupuesto' : 'Definir presupuesto'}
               </button>
-            </div>
+            ) : (
+              <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+                <div className="text-[11px] text-zinc-400">Definir presupuesto (COP)</div>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm"
+                    inputMode="numeric"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="Ej: 5.000.000"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      type="button"
+                      disabled={!canSave}
+                      onClick={() => {
+                        if (!Number.isFinite(parsed) || parsed === budgetTotal) return
+                        onSave(parsed)
+                        show({ kind: 'success', message: 'Presupuesto actualizado.' })
+                        setEditing(false)
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                      Guardar
+                    </button>
+                    <button
+                      className="inline-flex items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-900"
+                      type="button"
+                      onClick={() => {
+                        setValue(budgetTotal ? String(budgetTotal) : '')
+                        setEditing(false)
+                      }}
+                      aria-label="Cancelar"
+                      title="Cancelar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="shrink-0">
+        <div className="shrink-0 self-center sm:self-start">
           <Donut
             size={132}
             thickness={14}
@@ -691,7 +767,7 @@ function BudgetHero({
 
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-zinc-900">
         <div
-          className="h-full rounded-full bg-rose-500"
+          className={`h-full rounded-full ${overspent ? 'bg-rose-500' : 'bg-emerald-500'}`}
           style={{ width: `${budgetTotal > 0 ? Math.min(100, Math.max(0.5, (spentTotal / budgetTotal) * 100)) : 0}%` }}
         />
       </div>

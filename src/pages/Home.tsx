@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { PlusCircle, Map as MapIcon, Calendar as CalendarIcon, Globe, Share2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
@@ -10,11 +10,17 @@ import FlagAvatar from '@/components/FlagAvatar'
 import { parseYmd } from '@/utils/date'
 import type { AppExpense } from '@/../shared/types'
 import { supabase } from '@/supabase/client'
+import { useNoticeStore } from '@/stores/noticeStore'
+import ShareLinkModal from '@/components/ShareLinkModal'
+import { getTripShareToken, setTripShareToken, tripShareUrl } from '@/utils/tripShare'
 
 export default function Home() {
   useDynamicHead('Inicio', 'Home')
   const navigate = useNavigate()
   const setActiveTripId = useTripStore((s) => s.setActiveTripId)
+  const show = useNoticeStore((s) => s.show)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
   const { value: trips = [] } = useLiveQuery(
     async () => await db.viajes.filter(t => t.deleted_at == null).toArray(),
     [],
@@ -90,23 +96,37 @@ export default function Home() {
   }
 
   async function shareTrip(tripId: string) {
+    const cached = await getTripShareToken(tripId)
+    if (cached) {
+      const url = tripShareUrl(cached)
+      try {
+        await navigator.clipboard.writeText(url)
+        show({ kind: 'success', message: 'Link copiado al portapapeles.' })
+      } catch {
+        setShareUrl(url)
+        setShareOpen(true)
+      }
+      return
+    }
     if (!supabase) {
-      alert('Supabase no está configurado. No se puede generar el link.')
+      show({ kind: 'error', message: 'Supabase no está configurado. No se puede generar el link.' })
       return
     }
     try {
       const { data, error } = await supabase.rpc('create_trip_share', { p_trip_id: tripId })
       if (error) throw error
-      const url = `${window.location.origin}/compartir/${data}`
+      await setTripShareToken(tripId, data)
+      const url = tripShareUrl(data)
       try {
         await navigator.clipboard.writeText(url)
-        alert('Link copiado al portapapeles.')
+        show({ kind: 'success', message: 'Link copiado al portapapeles.' })
       } catch {
-        alert(url)
+        setShareUrl(url)
+        setShareOpen(true)
       }
     } catch (e) {
       console.error(e)
-      alert('Error generando link para compartir.')
+      show({ kind: 'error', message: 'Error generando link para compartir.' })
     }
   }
 
@@ -299,6 +319,7 @@ export default function Home() {
           </div>
         ) : null}
       </div>
+      <ShareLinkModal open={shareOpen} url={shareUrl} onClose={() => setShareOpen(false)} />
     </motion.div>
   )
 }

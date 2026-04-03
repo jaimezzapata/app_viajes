@@ -9,6 +9,7 @@ import { useTripStore } from '@/stores/tripStore'
 import AppShell from '@/components/AppShell'
 import AuthScreen from '@/components/AuthScreen'
 import GlobalErrorModal from '@/components/GlobalErrorModal'
+import AppNotices from '@/components/AppNotices'
 import Calendar from '@/pages/Calendar'
 import Expenses from '@/pages/Expenses'
 import Itinerary from '@/pages/Itinerary'
@@ -70,6 +71,7 @@ export default function App() {
     return (
       <>
         <GlobalErrorModal />
+        <AppNotices />
         <div className="flex min-h-[100dvh] items-center justify-center bg-[#0b1220] px-4">
           <div className="w-full max-w-md rounded-3xl border border-zinc-800/60 bg-zinc-950/60 p-6 text-zinc-100">
             <div className="text-lg font-bold">Configuración incompleta</div>
@@ -85,6 +87,7 @@ export default function App() {
   return (
     <>
       <GlobalErrorModal />
+      <AppNotices />
       <BrowserRouter>
         <Routes>
           <Route path="/compartir/:token" element={<SharedTrip />} />
