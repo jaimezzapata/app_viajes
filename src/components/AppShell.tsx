@@ -13,6 +13,7 @@ import { useTripStore } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { addDays, toYmd } from '@/utils/date'
 import TripConfigModal from '@/components/TripConfigModal'
+import SheetSelect from '@/components/SheetSelect'
 
 export default function AppShell({ children }: PropsWithChildren) {
   const online = useOnline()
@@ -226,24 +227,23 @@ function TripSelector({ onConfigure }: { onConfigure: (isNew?: boolean) => void 
   // Always render the select so users can see the "Nuevo viaje" option even if DB drops
   return (
     <div className="flex items-center gap-1 ml-1">
-      <select
-        value={activeTripId ?? ''}
-        onChange={(e) => {
-          if (e.target.value === 'NEW') void handleNewTrip()
-          else setActiveTripId(e.target.value)
-        }}
-        className="max-w-[140px] truncate rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-sky-400 outline-none hover:bg-zinc-800 focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50"
-      >
-        {trips.length === 0 ? <option value="">(Sin viajes)</option> : null}
-        {trips.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-        <option value="NEW" className="text-emerald-400 font-bold">
-          + Nuevo viaje
-        </option>
-      </select>
+      <div className="w-[170px]">
+        <SheetSelect
+          title="Viajes"
+          value={(activeTripId ?? '') as string}
+          placeholder="Seleccionar"
+          options={[
+            ...(trips.length === 0 ? [{ value: '', label: '(Sin viajes)', disabled: true }] : []),
+            ...trips.map((t) => ({ value: t.id, label: t.name || 'Sin nombre' })),
+            { value: 'NEW', label: '+ Nuevo viaje' },
+          ]}
+          onChange={(v) => {
+            if (v === 'NEW') void handleNewTrip()
+            else if (v) setActiveTripId(v)
+          }}
+          buttonClassName="flex w-full items-center justify-between gap-2 truncate rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-sky-400 outline-none hover:bg-zinc-800 focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50"
+        />
+      </div>
     </div>
   )
 }

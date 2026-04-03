@@ -1,14 +1,13 @@
 import Page from '@/components/Page'
 import { db } from '@/db/appDb'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
-import { useOnline } from '@/hooks/useOnline'
 import { syncNow } from '@/sync/sync'
 import type { AppBudget, AppCategory, AppExpense, CategoryKind, CountryStage, UUID } from '@/../shared/types'
 import { CATEGORY_KIND_COLOR, CATEGORY_KIND_LABEL } from '@/utils/categoryPalette'
 import { nowIso, newId } from '@/utils/id'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useTripStore } from '@/stores/tripStore'
-import { Download, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react'
+import { Download, FileText, FileSpreadsheet, ChevronDown, Share2 } from 'lucide-react'
 import { exportConsolidatedExcel, exportExecutivePdf } from '@/utils/export'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
@@ -16,11 +15,11 @@ import { normalizeCountryFlag } from '@/utils/flags'
 import FlagAvatar from '@/components/FlagAvatar'
 import { exportTripBackup, importTripBackup, type TripBackupV1 } from '@/utils/tripBackup'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/supabase/client'
 
 export default function Reports() {
   useDynamicHead('Reportes', 'BarChart3')
   const navigate = useNavigate()
-  const online = useOnline()
   const countries = useTripStore((s) => s.countries)
   const activeTripId = useTripStore((s) => s.activeTripId)
   const [downloadOpen, setDownloadOpen] = useState(false)
@@ -86,6 +85,32 @@ export default function Reports() {
       setExporting(false)
     }
   }, [])
+
+  const handleCreateShareLink = useCallback(async () => {
+    if (!activeTripId) return
+    if (!supabase) {
+      alert('Supabase no está configurado. No se puede generar el link.')
+      return
+    }
+    setExporting(true)
+    setDownloadOpen(false)
+    try {
+      const { data, error } = await supabase.rpc('create_trip_share', { p_trip_id: activeTripId })
+      if (error) throw error
+      const url = `${window.location.origin}/compartir/${data}`
+      try {
+        await navigator.clipboard.writeText(url)
+        alert('Link copiado al portapapeles.')
+      } catch {
+        alert(url)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error generando link para compartir. Revisa la consola.')
+    } finally {
+      setExporting(false)
+    }
+  }, [activeTripId])
 
   const { value: categories = [] } = useLiveQuery<AppCategory[]>(async () => await db.categorias.filter((c) => c.deleted_at == null).toArray(), [], [])
   const { value: expenses = [] } = useLiveQuery<AppExpense[]>(
@@ -265,58 +290,98 @@ export default function Reports() {
               {downloadOpen && (
                 <>
                   <motion.div
-                    className="fixed inset-0 z-40"
+                    className="fixed inset-0 z-40 bg-black/40"
                     onClick={() => setDownloadOpen(false)}
                   />
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-2xl border border-zinc-800 bg-zinc-900 p-2 shadow-xl shadow-black/50"
-                  >
-                    <button
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
-                      onClick={() => void handleExportBackup()}
-                    >
-                      <Download className="h-4 w-4 text-sky-400" />
-                      <div>
-                        <div>Backup (JSON)</div>
-                        <div className="text-[10px] text-zinc-500 font-normal">Exporta viaje completo</div>
-                      </div>
-                    </button>
-                    <button
-                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
-                      onClick={() => importRef.current?.click()}
-                      type="button"
-                    >
-                      <Download className="h-4 w-4 text-sky-400 rotate-180" />
-                      <div>
-                        <div>Importar backup</div>
-                        <div className="text-[10px] text-zinc-500 font-normal">Restaura desde JSON</div>
-                      </div>
-                    </button>
-                    <div className="my-2 h-px bg-zinc-800" />
-                    <button
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
-                      onClick={() => handleExport('pdf')}
-                    >
-                      <FileText className="h-4 w-4 text-rose-400" />
-                      <div>
-                        <div>Resumen Ejecutivo</div>
-                        <div className="text-[10px] text-zinc-500 font-normal">Documento PDF estático</div>
-                      </div>
-                    </button>
-                    <button
-                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-emerald-400 transition-colors hover:bg-zinc-800"
-                      onClick={() => handleExport('excel')}
-                    >
-                      <FileSpreadsheet className="h-4 w-4" />
-                      <div>
-                        <div>Consolidado Full</div>
-                        <div className="text-[10px] text-zinc-500 font-normal">Excel con Gastos e Itinerarios</div>
-                      </div>
-                    </button>
+                  <motion.div className="fixed inset-x-0 bottom-0 z-50">
+                    <div className="mx-auto w-full max-w-md px-4 pb-24">
+                      <motion.div
+                        initial={{ opacity: 0, y: 18 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 18 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full rounded-3xl border border-zinc-800 bg-zinc-900 p-2 shadow-2xl shadow-black/60"
+                      >
+                        <div className="flex items-center justify-between px-2 py-2">
+                          <div className="text-sm font-semibold text-zinc-100">Exportar</div>
+                          <button
+                            type="button"
+                            className="rounded-xl px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+                            onClick={() => setDownloadOpen(false)}
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+                        <button
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
+                          onClick={() => void handleExportBackup()}
+                        >
+                          <Download className="h-4 w-4 text-sky-400" />
+                          <div>
+                            <div>Backup (JSON)</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Exporta viaje completo</div>
+                          </div>
+                        </button>
+                        <button
+                          className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-sky-200 transition-colors hover:bg-zinc-800"
+                          onClick={() => importRef.current?.click()}
+                          type="button"
+                        >
+                          <Download className="h-4 w-4 text-sky-400 rotate-180" />
+                          <div>
+                            <div>Importar backup</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Restaura desde JSON</div>
+                          </div>
+                        </button>
+                        <button
+                          className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+                          onClick={() => void handleCreateShareLink()}
+                          type="button"
+                        >
+                          <Share2 className="h-4 w-4 text-zinc-300" />
+                          <div>
+                            <div>Compartir viaje</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Link público (solo lectura)</div>
+                          </div>
+                        </button>
+                        <div className="my-2 h-px bg-zinc-800" />
+                        <button
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+                          onClick={() => handleExport('pdf')}
+                        >
+                          <FileText className="h-4 w-4 text-rose-400" />
+                          <div>
+                            <div>Resumen Ejecutivo</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Documento PDF estático</div>
+                          </div>
+                        </button>
+                        <button
+                          className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-emerald-400 transition-colors hover:bg-zinc-800"
+                          onClick={() => handleExport('excel')}
+                        >
+                          <FileSpreadsheet className="h-4 w-4" />
+                          <div>
+                            <div>Consolidado Full</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Excel con Gastos e Itinerarios</div>
+                          </div>
+                        </button>
+                        <div className="my-2 h-px bg-zinc-800" />
+                        <button
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+                          onClick={() => {
+                            setDownloadOpen(false)
+                            navigate('/diagnostico')
+                          }}
+                          type="button"
+                        >
+                          <div className="h-4 w-4 rounded-md bg-amber-500/15" />
+                          <div>
+                            <div>Salud de datos</div>
+                            <div className="text-[10px] text-zinc-500 font-normal">Detecta y arregla problemas comunes</div>
+                          </div>
+                        </button>
+                      </motion.div>
+                    </div>
                   </motion.div>
                 </>
               )}
@@ -333,21 +398,6 @@ export default function Reports() {
               if (file) void handleImportBackupFile(file)
             }}
           />
-          <button
-            className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900 disabled:opacity-50"
-            onClick={() => void syncNow()}
-            type="button"
-            disabled={!online}
-          >
-            Sincronizar
-          </button>
-          <button
-            className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-900"
-            onClick={() => navigate('/diagnostico')}
-            type="button"
-          >
-            Diagnóstico
-          </button>
         </div>
       </div>
 

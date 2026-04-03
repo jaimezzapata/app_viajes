@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatFxRate, getRateToCop } from '@/fx/fx'
+import FlagAvatar from '@/components/FlagAvatar'
+import SheetSelect from '@/components/SheetSelect'
 
 export type LodgingFormState = {
   stage: string
@@ -49,12 +51,20 @@ export default function LodgingModal({
   onDelete?: () => void
 }) {
   const isNational = useTripStore((s) => s.isNational)
+  const tripStartYmd = useTripStore((s) => s.tripStartYmd)
+  const tripEndYmd = useTripStore((s) => s.tripEndYmd)
   const fxTouchedRef = useRef(false)
   const currencyTouchedRef = useRef(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, currency: c.currency })),
+    () =>
+      countries.map((c) => ({
+        stage: c.code,
+        label: c.name,
+        cca2: c.acronym,
+        currency: c.currency,
+      })),
     [countries],
   )
 
@@ -155,7 +165,10 @@ export default function LodgingModal({
 
             <div className="mb-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
               <div className="text-xs font-semibold text-zinc-100 mb-2">{isNational ? 'Destino/Ciudad' : 'País'}</div>
-              <div className="grid grid-cols-3 gap-2">
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, stageOptions.length)}, minmax(0, 1fr))` }}
+              >
                 {stageOptions.map((o) => {
                   const active = form.stage === o.stage
                   return (
@@ -175,8 +188,8 @@ export default function LodgingModal({
                         void prefillFxRate(nextCurrency, form.check_in)
                       }}
                     >
-                      <div className="text-base leading-none">{o.flag}</div>
-                      <div className="max-w-full truncate leading-none">{o.label}</div>
+                      <FlagAvatar cca2={o.cca2} className="h-7 w-10" />
+                      <div className="max-w-full truncate leading-none text-[11px]">{o.label}</div>
                     </button>
                   )
                 })}
@@ -201,6 +214,8 @@ export default function LodgingModal({
                   type="date"
                   value={form.check_in}
                   onChange={(e) => setForm((f) => ({ ...f, check_in: e.target.value }))}
+                  min={tripStartYmd || undefined}
+                  max={(form.check_out || tripEndYmd) || undefined}
                 />
               </Field>
               <Field label="Check-out">
@@ -209,6 +224,8 @@ export default function LodgingModal({
                   type="date"
                   value={form.check_out}
                   onChange={(e) => setForm((f) => ({ ...f, check_out: e.target.value }))}
+                  min={(form.check_in || tripStartYmd) || undefined}
+                  max={tripEndYmd || undefined}
                 />
               </Field>
 
@@ -247,18 +264,15 @@ export default function LodgingModal({
                 {!isNational && (
                   <>
                     <Field label="Moneda">
-                      <select
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                      <SheetSelect
+                        title="Moneda"
                         value={form.currency}
-                        onChange={(e) => {
-                          setCurrency(e.target.value)
-                          void prefillFxRate(e.target.value, form.check_in)
+                        options={currencyOptions.map((c) => ({ value: c, label: c }))}
+                        onChange={(v) => {
+                          setCurrency(v)
+                          void prefillFxRate(v, form.check_in)
                         }}
-                      >
-                        {currencyOptions.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                      />
                     </Field>
                     <Field label="Tasa a COP">
                       <input

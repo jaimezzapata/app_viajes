@@ -8,6 +8,8 @@ import { stageForYmd, useTripStore } from '@/stores/tripStore'
 import { formatFxRate, getRateToCop } from '@/fx/fx'
 import AnimatedIcon from '@/components/AnimatedIcon'
 import { Globe } from 'lucide-react'
+import FlagAvatar from '@/components/FlagAvatar'
+import SheetSelect from '@/components/SheetSelect'
 
 export default function ExpenseModal({
   open,
@@ -45,12 +47,20 @@ export default function ExpenseModal({
   const countries = useTripStore((s) => s.countries)
   const segments = useTripStore((s) => s.segments)
   const isNational = useTripStore((s) => s.isNational)
+  const tripStartYmd = useTripStore((s) => s.tripStartYmd)
+  const tripEndYmd = useTripStore((s) => s.tripEndYmd)
   const fxTouchedRef = useRef(false)
   const currencyTouchedRef = useRef(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, currency: c.currency })),
+    () =>
+      countries.map((c) => ({
+        stage: c.code,
+        label: c.name,
+        cca2: c.acronym,
+        currency: c.currency,
+      })),
     [countries],
   )
 
@@ -262,7 +272,10 @@ export default function ExpenseModal({
                 </div>
               </div>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div
+                className="mt-2 grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, stageOptions.length)}, minmax(0, 1fr))` }}
+              >
                 {stageOptions.map((o) => {
                   const selectedStage = form.stageMode === 'AUTO' ? derivedStage : form.stage
                   const active = selectedStage === o.stage
@@ -286,8 +299,8 @@ export default function ExpenseModal({
                       }}
                       disabled={isMirror}
                     >
-                      <div className="text-base leading-none">{o.flag}</div>
-                      <div className="max-w-full truncate leading-none">{o.label}</div>
+                      <FlagAvatar cca2={o.cca2} className="h-7 w-10" />
+                      <div className="max-w-full truncate leading-none text-[11px]">{o.label}</div>
                     </button>
                   )
                 })}
@@ -295,10 +308,10 @@ export default function ExpenseModal({
 
               <div className="mt-2 rounded-2xl border border-zinc-900 bg-zinc-950/40 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-1 text-[11px] text-zinc-400">
-                  {countries.find((c) => c.code === derivedSegment?.fromStage)?.flag || <Globe className="w-3 h-3 text-zinc-400" />}
+                  <FlagAvatar cca2={countries.find((c) => c.code === derivedSegment?.fromStage)?.acronym} className="h-4 w-6" imgClassName="h-full w-full" />
                   <span>{countries.find((c) => c.code === derivedSegment?.fromStage)?.name ?? (derivedSegment?.fromStage ?? '—')}</span>
                   <span className="text-zinc-600">→</span>
-                  {countries.find((c) => c.code === derivedSegment?.toStage)?.flag || <Globe className="w-3 h-3 text-zinc-400" />}
+                  <FlagAvatar cca2={countries.find((c) => c.code === derivedSegment?.toStage)?.acronym} className="h-4 w-6" imgClassName="h-full w-full" />
                   <span>{countries.find((c) => c.code === derivedSegment?.toStage)?.name ?? (derivedSegment?.toStage ?? derivedStage)}</span>
                   <span>{form.stageMode === 'AUTO' ? ' · automático por fecha' : ' · tramo de referencia'}</span>
                 </div>
@@ -313,44 +326,40 @@ export default function ExpenseModal({
                   value={form.date}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                   disabled={isMirror}
+                  min={tripStartYmd || undefined}
+                  max={tripEndYmd || undefined}
                 />
               </Field>
 
               {!isNational && (
                 <Field label="Moneda">
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                  <SheetSelect
+                    title="Moneda"
                     value={form.currency}
-                    onChange={(e) => {
-                      setCurrency(e.target.value as ExpenseFormState['currency'])
-                      void prefillFxRate(e.target.value as ExpenseFormState['currency'], form.date)
-                    }}
                     disabled={isMirror}
-                  >
-                    {currencyOptions.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    options={currencyOptions.map((c) => ({ value: c, label: c }))}
+                    onChange={(v) => {
+                      setCurrency(v as ExpenseFormState['currency'])
+                      void prefillFxRate(v as ExpenseFormState['currency'], form.date)
+                    }}
+                  />
                 </Field>
               )}
             </div>
             
             <div className="mt-3 grid grid-cols-2 gap-3">
               <Field label="Categoría">
-                <select
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                <SheetSelect
+                  title="Categoría"
                   value={form.categoryKind}
-                  onChange={(e) => setForm((f) => ({ ...f, categoryKind: e.target.value as ExpenseFormState['categoryKind'], categoryId: '' }))}
                   disabled={isMirror}
-                >
-                  {kindOptions.map((k) => (
-                    <option key={k} value={k} disabled={(restrictedKinds ?? []).includes(k) && !(isEditing && form.categoryKind === k)}>
-                      {CATEGORY_KIND_LABEL[k]}
-                    </option>
-                  ))}
-                </select>
+                  options={kindOptions.map((k) => ({
+                    value: k,
+                    label: CATEGORY_KIND_LABEL[k],
+                    disabled: (restrictedKinds ?? []).includes(k) && !(isEditing && form.categoryKind === k),
+                  }))}
+                  onChange={(v) => setForm((f) => ({ ...f, categoryKind: v as ExpenseFormState['categoryKind'], categoryId: '' }))}
+                />
               </Field>
 
               <Field label={
@@ -361,26 +370,21 @@ export default function ExpenseModal({
                   ) : null}
                 </div>
               }>
-                <select
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                <SheetSelect
+                  title="Subcategoría"
                   value={form.categoryId}
-                  onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
                   disabled={isMirror || categories.length === 0 || (subcategories.length === 0 && !primaryByKind.get(form.categoryKind))}
-                >
-                  {categories.length === 0 ? <option value="" disabled>Cargando…</option> : null}
-                  {categories.length > 0 && subcategories.length === 0 ? (
-                    primaryByKind.get(form.categoryKind) ? (
-                      <option value={primaryByKind.get(form.categoryKind)!.id}>{CATEGORY_KIND_LABEL[form.categoryKind]}</option>
-                    ) : (
-                      <option value="" disabled>Sin categorías</option>
-                    )
-                  ) : null}
-                  {subcategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {formatSubcategoryLabel(c.name)}
-                    </option>
-                  ))}
-                </select>
+                  options={
+                    categories.length === 0
+                      ? [{ value: '' as string, label: 'Cargando…', disabled: true }]
+                      : subcategories.length === 0
+                        ? primaryByKind.get(form.categoryKind)
+                          ? [{ value: primaryByKind.get(form.categoryKind)!.id, label: CATEGORY_KIND_LABEL[form.categoryKind] }]
+                          : [{ value: '' as string, label: 'Sin categorías', disabled: true }]
+                        : subcategories.map((c) => ({ value: c.id, label: formatSubcategoryLabel(c.name) }))
+                  }
+                  onChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}
+                />
               </Field>
 
               <div className={isNational ? 'col-span-2' : ''}>

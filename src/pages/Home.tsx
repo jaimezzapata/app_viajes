@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { PlusCircle, Map as MapIcon, Calendar as CalendarIcon, Globe } from 'lucide-react'
+import { PlusCircle, Map as MapIcon, Calendar as CalendarIcon, Globe, Share2 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
@@ -9,6 +9,7 @@ import { useDynamicHead } from '@/hooks/useDynamicHead'
 import FlagAvatar from '@/components/FlagAvatar'
 import { parseYmd } from '@/utils/date'
 import type { AppExpense } from '@/../shared/types'
+import { supabase } from '@/supabase/client'
 
 export default function Home() {
   useDynamicHead('Inicio', 'Home')
@@ -88,6 +89,27 @@ export default function Home() {
     navigate('/calendario')
   }
 
+  async function shareTrip(tripId: string) {
+    if (!supabase) {
+      alert('Supabase no está configurado. No se puede generar el link.')
+      return
+    }
+    try {
+      const { data, error } = await supabase.rpc('create_trip_share', { p_trip_id: tripId })
+      if (error) throw error
+      const url = `${window.location.origin}/compartir/${data}`
+      try {
+        await navigator.clipboard.writeText(url)
+        alert('Link copiado al portapapeles.')
+      } catch {
+        alert(url)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Error generando link para compartir.')
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -139,8 +161,21 @@ export default function Home() {
                     <div className="absolute left-0 top-0 h-full w-1.5" style={{ backgroundColor: accent }} />
                     <div className="flex justify-between items-start mb-2 pl-1">
                       <div className="text-lg font-bold text-zinc-100">{trip.name || 'Sin nombre'}</div>
-                      <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-emerald-400 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-colors">
-                        <MapIcon className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void shareTrip(trip.id)
+                          }}
+                          title="Compartir"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-emerald-400 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-colors">
+                          <MapIcon className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
 
@@ -197,8 +232,21 @@ export default function Home() {
                     <div className="absolute left-0 top-0 h-full w-1.5" style={{ backgroundColor: accent }} />
                     <div className="flex justify-between items-start mb-2 pl-1">
                       <div className="text-lg font-bold text-zinc-100">{trip.name || 'Sin nombre'}</div>
-                      <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-sky-400 group-hover:bg-sky-500/10 group-hover:border-sky-500/30 transition-colors">
-                        <MapIcon className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void shareTrip(trip.id)
+                          }}
+                          title="Compartir"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-sky-400 group-hover:bg-sky-500/10 group-hover:border-sky-500/30 transition-colors">
+                          <MapIcon className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
 

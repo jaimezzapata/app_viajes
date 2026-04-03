@@ -1,10 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '@/db/appDb'
 import { useTripStore } from '@/stores/tripStore'
 import { newId, nowIso } from '@/utils/id'
 import { parseYmd, toYmd } from '@/utils/date'
 import type { AppActivity, ActivityType, AppExpense } from '@/../shared/types'
+import { formatFxRate, getRateToCop } from '@/fx/fx'
+import FlagAvatar from '@/components/FlagAvatar'
+import SheetSelect from '@/components/SheetSelect'
 
 const types: { val: ActivityType; label: string; bg: string; text: string }[] = [
   { val: 'MUSEO', label: 'Museo / Atracción', bg: 'bg-violet-500/20', text: 'text-violet-300' },
@@ -30,6 +33,9 @@ export default function ActivityModal({
   const selectedYmd = useTripStore((s) => s.selectedYmd)
   const countries = useTripStore((s) => s.countries)
   const isNational = useTripStore((s) => s.isNational)
+  const tripEndYmd = useTripStore((s) => s.tripEndYmd)
+  const fxTouchedRef = useRef(false)
+  const currencyTouchedRef = useRef(false)
 
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -38,13 +44,57 @@ export default function ActivityModal({
   const [type, setType] = useState<ActivityType>('TOUR')
   const [title, setTitle] = useState('')
   const [location, setLocation] = useState('')
-  const [bookingRefs, setBookingRefs] = useState('')
   const [notes, setNotes] = useState('')
 
-  // Dual-save / Mirror Expense
-  const [createExpense, setCreateExpense] = useState(true)
-  const [expenseAmountStr, setExpenseAmountStr] = useState('')
+  const [currency, setCurrency] = useState('COP')
+  const [fxRate, setFxRate] = useState('1')
+  const [amountOriginal, setAmountOriginal] = useState('0')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const stageOptions = useMemo(
+    () =>
+      countries.map((c) => ({
+        stage: c.code,
+        label: c.name,
+        currency: c.currency,
+        cca2: c.acronym,
+      })),
+    [countries],
+  )
+
+  const currencyOptions = useMemo(() => {
+    const set = new Set<string>()
+    set.add('COP')
+    for (const c of countries) {
+      const cur = String(c.currency ?? '').trim().toUpperCase()
+      if (cur) set.add(cur)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [countries])
+
+  const stageToCurrency = useMemo(() => new Map(stageOptions.map((o) => [o.stage, o.currency] as const)), [stageOptions])
+
+  function setCurrencyTouched(next: string) {
+    currencyTouchedRef.current = true
+    setCurrency(next)
+  }
+
+  async function prefillFx(nextCurrency: string, ymd: string) {
+    if (fxTouchedRef.current) return
+    if (nextCurrency === 'COP') {
+      setFxRate('1')
+      return
+    }
+    if (!ymd) return
+    try {
+      const fx = await getRateToCop(nextCurrency, ymd)
+      const txt = formatFxRate(fx.rate)
+      if (!txt) return
+      setFxRate((prev) => (fxTouchedRef.current ? prev : txt))
+    } catch {
+      return
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -56,19 +106,22 @@ export default function ActivityModal({
       setType(existingItem.type)
       setTitle(existingItem.title)
       setLocation(existingItem.location || '')
-      setBookingRefs(existingItem.booking_refs || '')
       setNotes(existingItem.notes)
-      
-      setCreateExpense(true)
-      setExpenseAmountStr('')
-      
-      // Fetch existing connected expense
-      db.gastos.get(existingItem.id).then(exp => {
-        if (exp) {
-          setExpenseAmountStr(exp.amount_original.toString())
-        } else {
-          setExpenseAmountStr('0')
+
+      fxTouchedRef.current = false
+      currencyTouchedRef.current = false
+
+      void db.gastos.get(existingItem.id).then((exp) => {
+        if (!exp) {
+          const expected = stageToCurrency.get(existingItem.stage) ?? 'COP'
+          setCurrency(expected)
+          setFxRate('1')
+          setAmountOriginal('0')
+          return
         }
+        setCurrency(exp.currency ?? (stageToCurrency.get(existingItem.stage) ?? 'COP'))
+        setFxRate(String(exp.fx_rate_to_cop ?? 1))
+        setAmountOriginal(String(exp.amount_original ?? 0))
       })
     } else {
       let candidateDate = selectedYmd || tripStartYmd || toYmd(new Date())
@@ -91,13 +144,16 @@ export default function ActivityModal({
       setType('TOUR')
       setTitle('')
       setLocation('')
-      setBookingRefs('')
       setNotes('')
-      
-      setCreateExpense(true)
-      setExpenseAmountStr('')
+
+      fxTouchedRef.current = false
+      currencyTouchedRef.current = false
+      const expected = stageToCurrency.get(bestStage) ?? 'COP'
+      setCurrency(isNational ? 'COP' : expected)
+      setFxRate('1')
+      setAmountOriginal('0')
     }
-  }, [open, existingItem, selectedYmd, tripStartYmd, segments, countries])
+  }, [open, existingItem, selectedYmd, tripStartYmd, segments, countries, isNational, stageToCurrency])
 
   useEffect(() => {
     if (existingItem) return
@@ -114,6 +170,26 @@ export default function ActivityModal({
     }
     setStage(bestStage)
   }, [date, segments, countries, existingItem])
+
+  useEffect(() => {
+    if (!open) return
+    if (existingItem) return
+    if (currencyTouchedRef.current) return
+    const expected = stageToCurrency.get(stage)
+    if (!expected) return
+    setCurrency(isNational ? 'COP' : expected)
+  }, [existingItem, isNational, open, stage, stageToCurrency])
+
+  useEffect(() => {
+    if (!open) return
+    fxTouchedRef.current = false
+    void prefillFx(currency, date)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    void prefillFx(currency, date)
+  }, [currency, date, open])
 
   async function onSave() {
     if (!title.trim() || !activeTripId) return
@@ -132,16 +208,18 @@ export default function ActivityModal({
       type,
       title: title.trim(),
       location: location.trim() || null,
-      booking_refs: bookingRefs.trim() || null,
+      booking_refs: existingItem?.booking_refs ?? null,
       notes: notes.trim(),
       created_at: existingItem?.created_at || ts,
       updated_at: ts,
       deleted_at: null,
     }
 
-    // All activities MUST have a mirror expense now.
-    const val = parseFloat(expenseAmountStr.replace(/[^0-9.-]/g, ''))
-    const finalVal = isNaN(val) || val < 0 ? 0 : val
+    const parsedAmount = parseFloat(String(amountOriginal ?? '').replace(/[^0-9.-]/g, ''))
+    const finalAmount = isNaN(parsedAmount) || parsedAmount < 0 ? 0 : parsedAmount
+    const parsedFx = parseFloat(String(fxRate ?? '').replace(/[^0-9.-]/g, ''))
+    const finalFx = isNational || currency === 'COP' ? 1 : isNaN(parsedFx) || parsedFx <= 0 ? 1 : parsedFx
+    const amountCop = Math.round(finalAmount * finalFx)
 
     await db.transaction('rw', [db.actividades, db.gastos, db.categorias, db.outbox, db.meta], async () => {
       await db.actividades.put(item)
@@ -159,7 +237,7 @@ export default function ActivityModal({
       // Get category
       let tCatId = ''
       const categories = await db.categorias.toArray()
-      let tCat = categories.find((c) => c.kind === 'ENTRETENIMIENTO' && (c.subkind === 'GENERAL' || c.deleted_at == null))
+      let tCat = categories.find((c) => c.kind === 'ENTRETENIMIENTO' && c.subkind === 'GENERAL' && c.deleted_at == null)
       if (tCat) {
         tCatId = tCat.id
       } else {
@@ -179,18 +257,6 @@ export default function ActivityModal({
         await db.categorias.put(emergencyCat)
       }
 
-      const countryObj = countries.find((c) => c.code === stage)
-      const myCurrency = countryObj?.currency || 'COP'
-      
-      const fxMeta = await db.meta.get(`fx_${myCurrency}`)
-      let tRate = 1
-      if (fxMeta) {
-        try {
-          const parsed = JSON.parse(fxMeta.value)
-          tRate = Number(parsed.cop_per_unit || 1)
-        } catch { }
-      }
-
       const expId = id // Bind exactly to the activity ID
       const existE = await db.gastos.get(expId)
       
@@ -202,10 +268,10 @@ export default function ActivityModal({
         stage,
         category_id: tCatId,
         description: title.trim(),
-        currency: myCurrency,
-        amount_original: finalVal,
-        fx_rate_to_cop: tRate,
-        amount_cop: finalVal * tRate,
+        currency: isNational ? 'COP' : currency,
+        amount_original: finalAmount,
+        fx_rate_to_cop: finalFx,
+        amount_cop: amountCop,
         created_at: existE ? existE.created_at : ts,
         updated_at: ts,
         deleted_at: null,
@@ -305,12 +371,15 @@ export default function ActivityModal({
                 <div className="mb-2 text-[11px] font-medium tracking-wide text-zinc-400">
                   {isNational ? 'Destino / Ciudad (*)' : 'País / Etapa (*)'}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {countries.map((c) => {
-                    const active = stage === c.code
+                <div
+                  className="grid gap-2"
+                  style={{ gridTemplateColumns: `repeat(${Math.max(1, stageOptions.length)}, minmax(0, 1fr))` }}
+                >
+                  {stageOptions.map((o) => {
+                    const active = stage === o.stage
                     return (
                       <button
-                        key={c.code}
+                        key={o.stage}
                         type="button"
                         className={
                           'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
@@ -318,10 +387,14 @@ export default function ActivityModal({
                             ? 'border-sky-500 bg-sky-500/10 text-zinc-50'
                             : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
                         }
-                        onClick={() => setStage(c.code)}
+                        onClick={() => {
+                          setStage(o.stage)
+                          const expected = stageToCurrency.get(o.stage) ?? 'COP'
+                          if (!currencyTouchedRef.current) setCurrency(isNational ? 'COP' : expected)
+                        }}
                       >
-                        <div className="text-base leading-none">{c.flag}</div>
-                        <div className="max-w-full truncate leading-none">{c.name}</div>
+                        <FlagAvatar cca2={o.cca2} className="h-7 w-10" />
+                        <div className="max-w-full truncate leading-none text-[11px]">{o.label}</div>
                       </button>
                     )
                   })}
@@ -335,6 +408,8 @@ export default function ActivityModal({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
+                    min={tripStartYmd || undefined}
+                    max={tripEndYmd || undefined}
                   />
                 </Field>
                 <Field label="Hora Inicio">
@@ -356,25 +431,12 @@ export default function ActivityModal({
               </div>
 
               <Field label="Categoría de Actividad">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {types.map((t) => {
-                    const active = type === t.val
-                    return (
-                      <button
-                        key={t.val}
-                        type="button"
-                        onClick={() => setType(t.val)}
-                        className={`overflow-hidden rounded-xl border px-2 py-2 text-left text-xs font-semibold transition-all ${
-                          active
-                            ? `border-${t.bg.split('-')[1]}-500/50 ${t.bg} ${t.text} ring-1 ring-${t.bg.split('-')[1]}-500/50`
-                            : 'border-zinc-800/80 bg-zinc-950/50 text-zinc-400 hover:bg-zinc-900'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    )
-                  })}
-                </div>
+                <SheetSelect<ActivityType>
+                  title="Categoría"
+                  value={type}
+                  options={types.map((t) => ({ value: t.val, label: t.label }))}
+                  onChange={(v) => setType(v)}
+                />
               </Field>
 
               <Field label="Título (*)">
@@ -397,15 +459,6 @@ export default function ActivityModal({
                     onChange={(e) => setLocation(e.target.value)}
                   />
                 </Field>
-                <Field label="Ticket / #Reserva (Opcional)">
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
-                    type="text"
-                    placeholder="Ej: Código QR-482..."
-                    value={bookingRefs}
-                    onChange={(e) => setBookingRefs(e.target.value)}
-                  />
-                </Field>
               </div>
 
               <Field label="Notas Adicionales">
@@ -418,22 +471,46 @@ export default function ActivityModal({
                 />
               </Field>
 
-              <div className="mt-2 rounded-2xl border border-sky-900/40 bg-sky-950/20 p-3">
-                <div>
-                  <div className="text-sm font-semibold text-zinc-200">Gasto Registrado Obligatorio</div>
-                  <div className="text-xs text-zinc-400">Si la actividad fue gratis, ingresa 0.</div>
-                </div>
-                
-                <div className="mt-3">
-                  <Field label={`Valor en ${isNational ? 'COP' : countries.find(c => c.code === stage)?.currency || '?'} (*)`}>
-                    <input
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-medium text-emerald-400 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
-                      type="number"
-                      placeholder="Ej: 50.00 ó 0"
-                      value={expenseAmountStr}
-                      onChange={(e) => setExpenseAmountStr(e.target.value)}
-                    />
-                  </Field>
+              <div className="mt-2 rounded-2xl border border-zinc-900 bg-zinc-950/40 p-3">
+                <div className="text-sm font-semibold text-zinc-200">Costo (Opcional)</div>
+                <div className="mt-1 text-xs text-zinc-400">Si fue gratis, deja 0.</div>
+
+                <div className={`mt-3 grid ${isNational ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                  {!isNational ? (
+                    <>
+                      <Field label="Moneda">
+                        <SheetSelect
+                          title="Moneda"
+                          value={currency}
+                          options={currencyOptions.map((c) => ({ value: c, label: c }))}
+                          onChange={(v) => setCurrencyTouched(v)}
+                        />
+                      </Field>
+                      <Field label="Tasa a COP">
+                        <input
+                          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 transition-colors focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+                          inputMode="decimal"
+                          value={fxRate}
+                          onChange={(e) => {
+                            fxTouchedRef.current = true
+                            setFxRate(e.target.value)
+                          }}
+                          placeholder="1"
+                        />
+                      </Field>
+                    </>
+                  ) : null}
+                  <div className={isNational ? 'col-span-1' : 'col-span-2'}>
+                    <Field label={isNational ? 'Monto (COP)' : 'Monto'}>
+                      <input
+                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-medium text-emerald-400 focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+                        inputMode="decimal"
+                        placeholder="Ej: 50 ó 0"
+                        value={amountOriginal}
+                        onChange={(e) => setAmountOriginal(e.target.value)}
+                      />
+                    </Field>
+                  </div>
                 </div>
               </div>
             </div>
@@ -481,7 +558,7 @@ export default function ActivityModal({
                       Cancelar
                     </button>
                     <button
-                      disabled={!title.trim() || !expenseAmountStr}
+                      disabled={!title.trim()}
                       className="rounded-xl bg-sky-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-sky-500/20 transition-all hover:bg-sky-400 active:scale-95 disabled:opacity-50 disabled:shadow-none"
                       onClick={onSave}
                       type="button"

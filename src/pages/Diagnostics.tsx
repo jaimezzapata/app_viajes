@@ -1,20 +1,22 @@
 import Page from '@/components/Page'
 import { useLiveQuery } from '@/hooks/useLiveQuery'
 import { db } from '@/db/appDb'
-import { useTripStore } from '@/stores/tripStore'
-import { useMemo } from 'react'
+import { stageForYmd, useTripStore } from '@/stores/tripStore'
+import { useMemo, useState } from 'react'
 import type { AppActivity, AppCategory, AppExpense, AppItinerary, AppLodging, CategoryKind } from '@/../shared/types'
 import { useDynamicHead } from '@/hooks/useDynamicHead'
+import { newId, nowIso } from '@/utils/id'
 
 type Issue = { key: string; title: string; severity: 'error' | 'warn'; lines: string[] }
 
 export default function Diagnostics() {
-  useDynamicHead('Diagnóstico', 'TriangleAlert')
+  useDynamicHead('Salud de datos', 'TriangleAlert')
   const activeTripId = useTripStore((s) => s.activeTripId)
   const tripStartYmd = useTripStore((s) => s.tripStartYmd)
   const tripEndYmd = useTripStore((s) => s.tripEndYmd)
   const countries = useTripStore((s) => s.countries)
   const segments = useTripStore((s) => s.segments)
+  const [fixing, setFixing] = useState(false)
 
   const { value: categories = [] } = useLiveQuery<AppCategory[]>(async () => await db.categorias.filter((c) => c.deleted_at == null).toArray(), [], [])
 
@@ -53,6 +55,89 @@ export default function Diagnostics() {
     [activeTripId],
     [],
   )
+
+  const stageSet = useMemo(() => new Set(countries.map((c) => c.code)), [countries])
+  const invalidExpenses = useMemo(() => expenses.filter((e) => !stageSet.has(e.stage)), [expenses, stageSet])
+
+  async function fixInvalidExpenseStages() {
+    if (!activeTripId) return
+    if (invalidExpenses.length === 0) return
+    const fallback = countries[0]?.code ?? 'COLOMBIA'
+    const ts = nowIso()
+    setFixing(true)
+    try {
+      await db.transaction('rw', [db.gastos, db.itinerarios, db.hospedajes, db.actividades, db.outbox], async () => {
+        for (const e of invalidExpenses) {
+          const computed = stageForYmd(e.date, segments, fallback)
+          const nextStage = stageSet.has(computed) ? computed : fallback
+          if (!nextStage || e.stage === nextStage) continue
+
+          const updatedE: AppExpense = { ...e, stage: nextStage, updated_at: ts }
+          await db.gastos.put(updatedE)
+          await db.outbox.add({
+            id: newId(),
+            table_name: 'gastos',
+            op: 'UPSERT',
+            entity_id: updatedE.id,
+            payload: updatedE,
+            created_at: ts,
+            try_count: 0,
+            last_error: null,
+          })
+
+          const it = await db.itinerarios.get(e.id)
+          if (it && it.deleted_at == null && it.trip_id === activeTripId && it.stage !== nextStage) {
+            const updatedI: AppItinerary = { ...it, stage: nextStage, updated_at: ts }
+            await db.itinerarios.put(updatedI)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'itinerarios',
+              op: 'UPSERT',
+              entity_id: updatedI.id,
+              payload: updatedI,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
+
+          const l = await db.hospedajes.get(e.id)
+          if (l && l.deleted_at == null && l.trip_id === activeTripId && l.stage !== nextStage) {
+            const updatedL: AppLodging = { ...l, stage: nextStage, updated_at: ts }
+            await db.hospedajes.put(updatedL)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'hospedajes',
+              op: 'UPSERT',
+              entity_id: updatedL.id,
+              payload: updatedL,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
+
+          const a = await db.actividades.get(e.id)
+          if (a && a.deleted_at == null && a.trip_id === activeTripId && a.stage !== nextStage) {
+            const updatedA: AppActivity = { ...a, stage: nextStage, updated_at: ts }
+            await db.actividades.put(updatedA)
+            await db.outbox.add({
+              id: newId(),
+              table_name: 'actividades',
+              op: 'UPSERT',
+              entity_id: updatedA.id,
+              payload: updatedA,
+              created_at: ts,
+              try_count: 0,
+              last_error: null,
+            })
+          }
+        }
+      })
+    } finally {
+      setFixing(false)
+    }
+  }
 
   const issues = useMemo<Issue[]>(() => {
     const res: Issue[] = []
@@ -98,8 +183,7 @@ export default function Diagnostics() {
       }
     }
 
-    const stageSet = new Set(countries.map((c) => c.code))
-    const invalidStages = expenses.filter((e) => !stageSet.has(e.stage)).map((e) => `• ${e.date} ${e.stage} (${e.description || e.id})`)
+    const invalidStages = invalidExpenses.map((e) => `• ${e.date} ${e.stage} (${e.description || e.id})`)
     if (invalidStages.length > 0) {
       res.push({ key: 'expenses_invalid_stage', title: 'Gastos con país/tramo inválido', severity: 'warn', lines: invalidStages.slice(0, 15) })
     }
@@ -145,13 +229,13 @@ export default function Diagnostics() {
     }
 
     return res
-  }, [activities, categories, countries, expenses, itineraries, lodgings, segments, tripEndYmd, tripStartYmd])
+  }, [activities, categories, countries, expenses, invalidExpenses, itineraries, lodgings, segments, tripEndYmd, tripStartYmd])
 
   return (
     <Page>
       <div className="mb-4">
         <div className="text-xs text-zinc-400">Calidad de datos</div>
-        <div className="text-base font-semibold">Diagnóstico</div>
+        <div className="text-base font-semibold">Salud de datos</div>
       </div>
 
       {!activeTripId ? (
@@ -168,6 +252,21 @@ export default function Diagnostics() {
                 <div className={`text-sm font-semibold ${it.severity === 'error' ? 'text-rose-200' : 'text-zinc-100'}`}>{it.title}</div>
                 <div className="text-xs text-zinc-500">{it.severity === 'error' ? 'Error' : 'Aviso'}</div>
               </div>
+              {it.key === 'expenses_invalid_stage' && invalidExpenses.length > 0 ? (
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="text-xs text-zinc-500">
+                    Arregla esto reasignando el país según los tramos del viaje.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void fixInvalidExpenseStages()}
+                    disabled={fixing}
+                    className="rounded-xl bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+                  >
+                    {fixing ? 'Arreglando…' : 'Arreglar'}
+                  </button>
+                </div>
+              ) : null}
               <div className="mt-2 whitespace-pre-line text-xs text-zinc-400">{it.lines.join('\n')}</div>
             </div>
           ))}
@@ -176,4 +275,3 @@ export default function Diagnostics() {
     </Page>
   )
 }
-

@@ -5,6 +5,8 @@ import { useTripStore } from '@/stores/tripStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { useEffect, useMemo, useState, useRef } from 'react'
+import FlagAvatar from '@/components/FlagAvatar'
+import SheetSelect from '@/components/SheetSelect'
 
 export type ItineraryFormState = {
   date: string
@@ -53,12 +55,20 @@ export default function ItineraryModal({
   amountCop: number
 }) {
   const isNational = useTripStore((s) => s.isNational)
+  const tripStartYmd = useTripStore((s) => s.tripStartYmd)
+  const tripEndYmd = useTripStore((s) => s.tripEndYmd)
   const fxTouchedRef = useRef(false)
   const currencyTouchedRef = useRef(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const stageOptions = useMemo(
-    () => countries.map((c) => ({ stage: c.code, label: c.name, flag: c.flag, currency: c.currency })),
+    () =>
+      countries.map((c) => ({
+        stage: c.code,
+        label: c.name,
+        cca2: c.acronym,
+        currency: c.currency,
+      })),
     [countries],
   )
 
@@ -162,67 +172,78 @@ export default function ItineraryModal({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Field label="País">
+                  <div
+                    className="grid gap-2"
+                    style={{ gridTemplateColumns: `repeat(${Math.max(1, stageOptions.length)}, minmax(0, 1fr))` }}
+                  >
+                    {stageOptions.map((o) => {
+                      const active = form.stage === o.stage
+                      return (
+                        <button
+                          key={o.stage}
+                          type="button"
+                          className={
+                            'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
+                            (active
+                              ? 'border-sky-500 bg-sky-500/10 text-zinc-50'
+                              : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
+                          }
+                          onClick={() => {
+                            const expected = stageToCurrency.get(o.stage)
+                            const nextCurrency = currencyTouchedRef.current ? form.currency : (expected ?? form.currency)
+                            setForm((f) => ({ ...f, stage: o.stage, currency: nextCurrency }))
+                            void prefillFxRate(nextCurrency, form.date)
+                          }}
+                        >
+                          <FlagAvatar cca2={o.cca2} className="h-7 w-10" />
+                          <div className="max-w-full truncate leading-none text-[11px]">{o.label}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Field>
+              </div>
+
               <Field label="Fecha">
                 <input
                   className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  min={tripStartYmd || undefined}
+                  max={tripEndYmd || undefined}
                 />
-              </Field>
-
-              <Field label="País">
-                <div className="grid grid-cols-3 gap-2">
-                  {stageOptions.map((o) => {
-                    const active = form.stage === o.stage
-                    return (
-                      <button
-                        key={o.stage}
-                        type="button"
-                        className={
-                          'flex w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-xs transition-colors ' +
-                          (active
-                            ? 'border-sky-500 bg-sky-500/10 text-zinc-50'
-                            : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:bg-zinc-900')
-                        }
-                        onClick={() => {
-                          const expected = stageToCurrency.get(o.stage)
-                          const nextCurrency = currencyTouchedRef.current ? form.currency : (expected ?? form.currency)
-                          setForm((f) => ({ ...f, stage: o.stage, currency: nextCurrency }))
-                          void prefillFxRate(nextCurrency, form.date)
-                        }}
-                      >
-                        <div className="text-base leading-none">{o.flag}</div>
-                        <div className="max-w-full truncate leading-none">{o.label}</div>
-                      </button>
-                    )
-                  })}
-                </div>
               </Field>
 
               <Field label="Tipo">
-                <select
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                <SheetSelect<AppItinerary['type']>
+                  title="Tipo"
                   value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as AppItinerary['type'] }))}
-                >
-                  <option value="VUELO">Vuelo</option>
-                  <option value="TREN">Tren</option>
-                  <option value="BUS">Bus</option>
-                  <option value="METRO">Metro</option>
-                  <option value="A_PIE">A pie</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-              </Field>
-
-              <Field label="Título">
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Ej: Vuelo a Tokio"
+                  options={[
+                    { value: 'VUELO', label: 'Vuelo' },
+                    { value: 'TREN', label: 'Tren' },
+                    { value: 'BUS', label: 'Bus' },
+                    { value: 'METRO', label: 'Metro' },
+                    { value: 'A_PIE', label: 'A pie' },
+                    { value: 'OTRO', label: 'Otro' },
+                  ]}
+                  onChange={(v) => setForm((f) => ({ ...f, type: v }))}
+                  buttonClassName="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 transition-colors focus:border-sky-500/50 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                 />
               </Field>
+
+              <div className="col-span-2">
+                <Field label="Título">
+                  <input
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="Ej: Vuelo a Tokio"
+                  />
+                </Field>
+              </div>
 
               <Field label="Desde">
                 <input
@@ -297,18 +318,15 @@ export default function ItineraryModal({
                 {!isNational && (
                   <>
                     <Field label="Moneda">
-                      <select
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm transition-all focus:border-sky-500/50 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                      <SheetSelect
+                        title="Moneda"
                         value={form.currency}
-                        onChange={(e) => {
-                          setCurrency(e.target.value)
-                          void prefillFxRate(e.target.value, form.date)
+                        options={currencyOptions.map((c) => ({ value: c, label: c }))}
+                        onChange={(v) => {
+                          setCurrency(v)
+                          void prefillFxRate(v, form.date)
                         }}
-                      >
-                        {currencyOptions.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                      />
                     </Field>
                     <Field label="Tasa a COP">
                       <input
@@ -459,4 +477,3 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </label>
   )
 }
-
