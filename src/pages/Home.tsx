@@ -162,17 +162,26 @@ export default function Home() {
                     <div className="flex justify-between items-start mb-2 pl-1">
                       <div className="text-lg font-bold text-zinc-100">{trip.name || 'Sin nombre'}</div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Compartir"
+                          title="Compartir"
                           className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             void shareTrip(trip.id)
                           }}
-                          title="Compartir"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              void shareTrip(trip.id)
+                            }
+                          }}
                         >
                           <Share2 className="w-4 h-4" />
-                        </button>
+                        </div>
                         <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-emerald-400 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 transition-colors">
                           <MapIcon className="w-4 h-4" />
                         </div>
@@ -233,17 +242,26 @@ export default function Home() {
                     <div className="flex justify-between items-start mb-2 pl-1">
                       <div className="text-lg font-bold text-zinc-100">{trip.name || 'Sin nombre'}</div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Compartir"
+                          title="Compartir"
                           className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             void shareTrip(trip.id)
                           }}
-                          title="Compartir"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              void shareTrip(trip.id)
+                            }
+                          }}
                         >
                           <Share2 className="w-4 h-4" />
-                        </button>
+                        </div>
                         <div className="flex items-center justify-center shrink-0 w-8 h-8 rounded-full bg-zinc-950 border border-zinc-800 text-sky-400 group-hover:bg-sky-500/10 group-hover:border-sky-500/30 transition-colors">
                           <MapIcon className="w-4 h-4" />
                         </div>
